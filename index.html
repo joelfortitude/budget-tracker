@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Budget &amp; Investment Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; }
+        .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 24px; border-radius: 8px; font-weight: 600; z-index: 1000; }
+        .toast.ok { background: #d1fae5; color: #065f46; }
+        .toast.err { background: #fee2e2; color: #991b1b; }
+    </style>
+<style type="text/css" nonce="">
+.redacted {
+  color: red !important;
+}</style></head>
+<body>
+    <div id="root"></div>
+    <div id="toast" class="toast" style="display:none;"></div>
+    <script type="text/babel">
+const { useState, useEffect } = React;
+
+// Icons
+const Icon = ({ d, size = 20 }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d}/></svg>;
+const Plus = () => <Icon d="M12 5v14M5 12h14" size={16}/>;
+const Trash = () => <Icon d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" size={16}/>;
+const Edit = () => <Icon d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" size={16}/>;
+const Check = () => <Icon d="M20 6L9 17l-5-5" size={16}/>;
+const Left = () => <Icon d="M15 18l-6-6 6-6" size={20}/>;
+const Right = () => <Icon d="M9 18l6-6-6-6" size={20}/>;
+const Down = () => <Icon d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" size={16}/>;
+const Up = () => <Icon d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" size={16}/>;
+
+const toast = (ok, msg) => { const t = document.getElementById('toast'); t.className = 'toast ' + (ok ? 'ok' : 'err'); t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2500); };
+const save = d => localStorage.setItem('budgetFull', JSON.stringify(d));
+const load = () => { try { return JSON.parse(localStorage.getItem('budgetFull')); } catch { return null; } };
+
+// Input component OUTSIDE App - uncontrolled, saves on blur
+const Input = React.memo(({ label, type = 'text', value, onChange, placeholder, className = '', disabled = false }) => {
+    const [localValue, setLocalValue] = React.useState(value || '');
+    React.useEffect(() => { setLocalValue(value || ''); }, [value]);
+    return (
+        <div className={className}>
+            {label && <label className="block text-xs text-gray-500 mb-1">{label}</label>}
+            <input 
+                type={type} 
+                value={localValue}
+                onChange={e => setLocalValue(e.target.value)}
+                onBlur={e => onChange && onChange(e)} 
+                placeholder={placeholder} 
+                disabled={disabled}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm ${disabled ? 'bg-gray-100 text-gray-400' : ''}`} 
+            />
+        </div>
+    );
+});
+
+const Select = React.memo(({ label, value, onChange, options, className = '' }) => (
+    <div className={className}>
+        {label && <label className="block text-xs text-gray-500 mb-1">{label}</label>}
+        <select value={value} onChange={onChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm">
+            {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+    </div>
+));
+
+// Component for budget item rows in Actual tab
+const BudgetItemRow = ({ item, type, isAdded, monthlyAmt, onAdd }) => {
+    return (
+        <div className={`flex justify-between items-center p-3 rounded-lg ${isAdded ? (type === 'income' ? 'bg-green-200' : 'bg-red-200') : 'bg-white'}`}>
+            <div className="flex items-center gap-2">
+                {isAdded && <span className={type === 'income' ? 'text-green-600' : 'text-red-600'}>✓</span>}
+                <span className={isAdded ? 'line-through text-gray-500' : ''}>{item.name}</span>
+                {item.category && <span className="text-xs bg-gray-200 px-2 py-0.5 rounded">{item.category}</span>}
+                <span className="text-xs text-gray-500">({item.type})</span>
+            </div>
+            <div className="flex items-center gap-2">
+                <span className="font-bold">${monthlyAmt.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+                {!isAdded && (
+                    <button 
+                        type="button"
+                        onClick={() => onAdd(item.name, monthlyAmt, item.category)}
+                        className={`${type === 'income' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'} text-white px-3 py-1 rounded text-sm`}
+                    >
+                        Add
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+};
+
+function App() {
+    const [loading, setLoading] = useState(true);
+    const [view, setView] = useState('dashboard');
+    const [month, setMonth] = useState(new Date());
+    
+    // State
+    const [fixedBudget, setFixedBudget] = useState({ incomes: [], expenses: [] });
+    const [actualBudget, setActualBudget] = useState({ incomes: [], expenses: [] });
+    const [realEstate, setRealEstate] = useState([]);
+    const [companies, setCompanies] = useState([]);
+    const [borrowedMoney, setBorrowedMoney] = useState([]);
+    const [generalIncome, setGeneralIncome] = useState([]);
+    const [transfers, setTransfers] = useState([]);
+    
+    const [editingProperty, setEditingProperty] = useState(null);
+    const [editingCompany, setEditingCompany] = useState(null);
+    
+    // Form state
+    const [newFI, setNewFI] = useState({ name: '', amount: 0, type: 'monthly' });
+    const [newFE, setNewFE] = useState({ name: '', amount: 0, type: 'monthly', category: '' });
+    const [newAI, setNewAI] = useState({ name: '', amount: 0, date: new Date().toISOString().split('T')[0] });
+    const [newAE, setNewAE] = useState({ name: '', amount: 0, date: new Date().toISOString().split('T')[0], category: '' });
+    const [newBorrowed, setNewBorrowed] = useState({ lenderName: '', amount: 0, monthlyInterest: 0, startDate: '', notes: '' });
+    const [newGenIncome, setNewGenIncome] = useState({ name: '', amount: 0, date: new Date().toISOString().split('T')[0], category: '' });
+    const [newTransfer, setNewTransfer] = useState({ fromGeneral: 0, toProperty: '', toCompany: '', date: new Date().toISOString().split('T')[0], notes: '' });
+
+    // Load/Save
+    useEffect(() => {
+        const d = load();
+        if (d) {
+            if (d.fixedBudget) setFixedBudget(d.fixedBudget);
+            if (d.actualBudget) setActualBudget(d.actualBudget);
+            if (d.realEstate) setRealEstate(d.realEstate);
+            if (d.companies) setCompanies(d.companies);
+            if (d.borrowedMoney) setBorrowedMoney(d.borrowedMoney);
+            if (d.generalIncome) setGeneralIncome(d.generalIncome);
+            if (d.transfers) setTransfers(d.transfers);
+        }
+        setLoading(false);
+    }, []);
+
+    useEffect(() => {
+        if (!loading) save({ fixedBudget, actualBudget, realEstate, companies, borrowedMoney, generalIncome, transfers, ts: Date.now() });
+    }, [fixedBudget, actualBudget, realEstate, companies, borrowedMoney, generalIncome, transfers, loading]);
+
+    const doExport = () => {
+        const data = { fixedBudget, actualBudget, realEstate, companies, borrowedMoney, generalIncome, transfers, version: '2.0', exported: new Date().toISOString() };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'my-budget-data.json'; a.click();
+        toast(true, '✓ Data exported!');
+    };
+
+    const doImport = e => {
+        const file = e.target.files[0]; if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => {
+            try {
+                const d = JSON.parse(ev.target.result);
+                if (d.fixedBudget) setFixedBudget(d.fixedBudget);
+                if (d.actualBudget) setActualBudget(d.actualBudget);
+                if (d.realEstate) setRealEstate(d.realEstate);
+                if (d.companies) setCompanies(d.companies);
+                if (d.borrowedMoney) setBorrowedMoney(d.borrowedMoney);
+                if (d.generalIncome) setGeneralIncome(d.generalIncome);
+                if (d.transfers) setTransfers(d.transfers);
+                toast(true, '✓ Data loaded!');
+            } catch { toast(false, '✗ Invalid file'); }
+        };
+        reader.readAsText(file);
+    };
+
+    // Helpers
+    const toMonthly = (a, t) => {
+        switch(t) {
+            case 'weekly': return a * 4.33;
+            case 'biweekly': return a * 2.17;
+            case 'semimonthly': return a * 2;
+            case 'monthly': return a;
+            case 'quarterly': return a / 3;
+            case 'semiannually': return a / 6;
+            case 'yearly': return a / 12;
+            default: return a;
+        }
+    };
+    const getMonthDate = () => {
+        const y = month.getFullYear();
+        const m = String(month.getMonth() + 1).padStart(2, '0');
+        return `${y}-${m}-01`;
+    };
+    const addBudgetIncome = (name, amount, category) => {
+        const newItem = { id: Date.now(), name, amount, date: getMonthDate(), category: category || '' };
+        setActualBudget(prev => ({...prev, incomes: [...prev.incomes, newItem]}));
+    };
+    const addBudgetExpense = (name, amount, category) => {
+        const newItem = { id: Date.now(), name, amount, date: getMonthDate(), category: category || '' };
+        setActualBudget(prev => ({...prev, expenses: [...prev.expenses, newItem]}));
+    };
+    const byMonth = (arr, m) => arr.filter(x => { if (!x.date) return false; const d = new Date(x.date); return d.getMonth() === m.getMonth() && d.getFullYear() === m.getFullYear(); });
+    const changeMonth = dir => setMonth(p => { const d = new Date(p); d.setMonth(d.getMonth() + dir); return d; });
+    const fmtMonth = d => d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+    // Budget calcs
+    const fixedInc = fixedBudget.incomes.reduce((s, i) => s + toMonthly(i.amount, i.type), 0);
+    const fixedExp = fixedBudget.expenses.reduce((s, e) => s + toMonthly(e.amount, e.type), 0);
+    const fixedBal = fixedInc - fixedExp;
+    const actualInc = byMonth(actualBudget.incomes, month).reduce((s, i) => s + i.amount, 0);
+    const actualExp = byMonth(actualBudget.expenses, month).reduce((s, e) => s + e.amount, 0);
+    const actualBal = actualInc - actualExp;
+
+    // Property metrics calculation
+    const calcPropertyMetrics = (p) => {
+        const getMyExpenseShare = () => {
+            if (p.ownershipType === 'sole') return 100;
+            switch (p.expenseSplit) {
+                case 'by-ownership': return p.ownershipPercentage || 100;
+                case 'custom': return p.customExpenseSplit || 0;
+                case '50-50': return 50;
+                case 'partner-pays-all': return 0;
+                case 'i-pay-all': return 100;
+                default: return p.ownershipPercentage || 100;
+            }
+        };
+        const getMyIncomeShare = () => {
+            if (p.ownershipType === 'sole') return 100;
+            switch (p.incomeSplit) {
+                case 'by-ownership': return p.ownershipPercentage || 100;
+                case 'custom': return p.customIncomeSplit || 0;
+                case '50-50': return 50;
+                default: return p.ownershipPercentage || 100;
+            }
+        };
+        
+        const myExpPct = getMyExpenseShare() / 100;
+        const myIncPct = getMyIncomeShare() / 100;
+        
+        // Use tenant rents if tenants exist, otherwise use monthlyRent field
+        const tenantRentTotal = (p.tenants || []).reduce((sum, t) => sum + (t.monthlyRent || 0), 0);
+        const baseRent = tenantRentTotal > 0 ? tenantRentTotal : (p.monthlyRent || 0);
+        const grossRent = baseRent + (p.otherIncome || 0);
+        // Allow 0% vacancy - only default to 5 if undefined
+        const vacancyPct = p.vacancyRate !== undefined ? p.vacancyRate : 5;
+        const effectiveIncome = grossRent * (1 - vacancyPct / 100);
+        
+        const taxMo = (p.propertyTax || 0) / 12;
+        const insMo = (p.insurance || 0) / 12;
+        const pmFee = p.propertyManagementType === 'percentage' ? (grossRent * (p.propertyManagement || 0) / 100) : (p.propertyManagement || 0);
+        // Allow 0% capex reserve
+        const capexPct = p.capexReserve !== undefined ? p.capexReserve : 5;
+        const capexMo = grossRent * capexPct / 100;
+        
+        const totalOpEx = taxMo + insMo + (p.hoa || 0) + pmFee + (p.maintenance || 0) + (p.repairs || 0) + (p.utilities || 0) + (p.landscaping || 0) + (p.pestControl || 0) + capexMo;
+        
+        const myOpEx = totalOpEx * myExpPct;
+        const myMortgage = (p.monthlyMortgage || 0) * myExpPct;
+        const myIncome = effectiveIncome * myIncPct;
+        
+        const noi = effectiveIncome - totalOpEx;
+        const myNOI = myIncome - myOpEx;
+        const cashFlow = myNOI - myMortgage;
+        const annualCashFlow = cashFlow * 12;
+        
+        const totalInvestment = (p.purchasePrice || 0) + (p.closingCosts || 0) + (p.rehabCosts || 0);
+        const cashInvested = (totalInvestment - (p.loanAmount || 0)) * ((p.ownershipPercentage || 100) / 100);
+        
+        const myValue = (p.currentValue || 0) * ((p.ownershipPercentage || 100) / 100);
+        const capRate = myValue > 0 ? (myNOI * 12 / myValue) * 100 : 0;
+        const cashOnCash = cashInvested > 0 ? (annualCashFlow / cashInvested) * 100 : 0;
+        const grm = grossRent > 0 ? (p.currentValue || 0) / (grossRent * 12) : 0;
+        const dscr = myMortgage > 0 ? myNOI / myMortgage : 0;
+        
+        const myLoanBal = (p.remainingBalance || 0) * ((p.ownershipPercentage || 100) / 100);
+        const equity = myValue - myLoanBal;
+        const ltv = (p.currentValue || 0) > 0 ? ((p.remainingBalance || 0) / p.currentValue) * 100 : 0;
+        const expenseRatio = effectiveIncome > 0 ? (totalOpEx / effectiveIncome) * 100 : 0;
+        
+        return { grossRent, effectiveIncome, totalOpEx, noi, myNOI, cashFlow, annualCashFlow, totalInvestment, cashInvested, myValue, capRate, cashOnCash, grm, dscr, equity, ltv, expenseRatio, myExpPct: myExpPct * 100, myIncPct: myIncPct * 100, myOpEx, myMortgage, myIncome };
+    };
+
+    // Portfolio totals
+    const totalValue = realEstate.reduce((s, p) => s + (p.currentValue || 0) * ((p.ownershipPercentage || 100) / 100), 0);
+    const totalEquity = realEstate.reduce((s, p) => s + calcPropertyMetrics(p).equity, 0);
+    const totalCashFlow = realEstate.reduce((s, p) => s + calcPropertyMetrics(p).cashFlow, 0);
+    const totalInvCost = companies.reduce((s, c) => s + (c.investment || 0), 0);
+    const totalInvValue = companies.reduce((s, c) => s + (c.currentValue || 0), 0);
+    const invGain = totalInvValue - totalInvCost;
+    const netWorth = totalValue + totalInvValue;
+    const totalBorrowed = borrowedMoney.reduce((s, b) => s + (b.amount || 0), 0);
+    const totalMonthlyInterest = borrowedMoney.reduce((s, b) => s + (b.monthlyInterest || 0), 0);
+    const totalGenIncome = generalIncome.reduce((s, g) => s + (g.amount || 0), 0);
+    const totalTransfersOut = transfers.reduce((s, t) => s + (t.fromGeneral || 0), 0);
+    const generalPot = totalGenIncome - totalTransfersOut;
+
+    // Real Estate CRUD
+    const numericFields = ['purchasePrice', 'closingCosts', 'rehabCosts', 'currentValue', 'loanAmount', 'interestRate', 'loanTerm', 'monthlyMortgage', 'remainingBalance', 'monthlyRent', 'otherIncome', 'vacancyRate', 'propertyTax', 'insurance', 'hoa', 'propertyManagement', 'maintenance', 'repairs', 'utilities', 'landscaping', 'pestControl', 'capexReserve', 'squareFeet', 'lotSize', 'bedrooms', 'bathrooms', 'units', 'stories', 'ownershipPercentage', 'partnerPercentage', 'customExpenseSplit', 'customIncomeSplit'];
+    
+    const updateProperty = (id, field, value) => {
+        setRealEstate(ps => ps.map(p => p.id === id ? { ...p, [field]: numericFields.includes(field) ? (parseFloat(value) || 0) : value } : p));
+    };
+    
+    const addProperty = () => {
+        setRealEstate(ps => [...ps, {
+            id: Date.now(),
+            name: 'New Property',
+            propertyType: 'single-family',
+            address: '', city: '', state: '', zipCode: '',
+            yearBuilt: '', squareFeet: 0, lotSize: 0, bedrooms: 0, bathrooms: 0, units: 1, stories: 1,
+            ownershipType: 'sole', ownershipPercentage: 100,
+            partnerName: '', partnerPercentage: 0,
+            expenseSplit: 'by-ownership', customExpenseSplit: 0,
+            incomeSplit: 'by-ownership', customIncomeSplit: 0,
+            purchaseDate: '', purchasePrice: 0, closingCosts: 0, rehabCosts: 0,
+            currentValue: 0, lastAppraisalDate: '',
+            financingType: 'conventional', loanAmount: 0, interestRate: 0, loanTerm: 30,
+            monthlyMortgage: 0, mortgageStartDate: '', remainingBalance: 0,
+            monthlyRent: 0, otherIncome: 0, vacancyRate: 5,
+            propertyTax: 0, insurance: 0, hoa: 0,
+            propertyManagement: 0, propertyManagementType: 'percentage',
+            maintenance: 0, repairs: 0, utilities: 0, landscaping: 0, pestControl: 0,
+            capexReserve: 5,
+            tenants: [],
+            status: 'occupied', notes: ''
+        }]);
+    };
+    
+    const deleteProperty = id => setRealEstate(ps => ps.filter(p => p.id !== id));
+    
+    const addTenant = (propId) => {
+        setRealEstate(ps => ps.map(p => p.id === propId ? { ...p, tenants: [...(p.tenants || []), {
+            id: Date.now(), name: '', unit: '', monthlyRent: 0,
+            leaseStart: '', leaseEnd: '', securityDeposit: 0, rentDueDay: 1,
+            phone: '', email: '', status: 'active', notes: ''
+        }] } : p));
+    };
+    
+    const updateTenant = (propId, tenantId, field, value) => {
+        const tenantNums = ['monthlyRent', 'securityDeposit', 'rentDueDay'];
+        setRealEstate(ps => ps.map(p => p.id === propId ? { ...p, tenants: (p.tenants || []).map(t => t.id === tenantId ? { ...t, [field]: tenantNums.includes(field) ? (parseFloat(value) || 0) : value } : t) } : p));
+    };
+    
+    const deleteTenant = (propId, tenantId) => setRealEstate(ps => ps.map(p => p.id === propId ? { ...p, tenants: (p.tenants || []).filter(t => t.id !== tenantId) } : p));
+
+    // Companies CRUD
+    const updateCompany = (id, field, value) => {
+        const compNums = ['investment', 'currentValue', 'shares'];
+        setCompanies(cs => cs.map(c => c.id === id ? { ...c, [field]: compNums.includes(field) ? (parseFloat(value) || 0) : value } : c));
+    };
+    const addCompany = () => setCompanies(cs => [...cs, { id: Date.now(), name: 'New Investment', investment: 0, currentValue: 0, shares: 0, purchaseDate: '', category: '', notes: '' }]);
+    const deleteCompany = id => setCompanies(cs => cs.filter(c => c.id !== id));
+
+    // Borrowed Money CRUD
+    const addBorrowed = () => { if (newBorrowed.lenderName && newBorrowed.amount > 0) { setBorrowedMoney(b => [...b, { ...newBorrowed, id: Date.now() }]); setNewBorrowed({ lenderName: '', amount: 0, monthlyInterest: 0, startDate: '', notes: '' }); } };
+    const deleteBorrowed = id => setBorrowedMoney(b => b.filter(x => x.id !== id));
+
+    // General Income CRUD
+    const addGenIncome = () => { if (newGenIncome.name && newGenIncome.amount > 0) { setGeneralIncome(g => [...g, { ...newGenIncome, id: Date.now() }]); setNewGenIncome({ name: '', amount: 0, date: new Date().toISOString().split('T')[0], category: '' }); } };
+    const deleteGenIncome = id => setGeneralIncome(g => g.filter(x => x.id !== id));
+
+    // Transfers CRUD
+    const addTransfer = () => { if (newTransfer.fromGeneral > 0 && (newTransfer.toProperty || newTransfer.toCompany)) { setTransfers(t => [...t, { ...newTransfer, id: Date.now() }]); setNewTransfer({ fromGeneral: 0, toProperty: '', toCompany: '', date: new Date().toISOString().split('T')[0], notes: '' }); } };
+    const deleteTransfer = id => setTransfers(t => t.filter(x => x.id !== id));
+
+    // Budget CRUD
+    const addFI = () => { if (newFI.name && newFI.amount > 0) { setFixedBudget(p => ({ ...p, incomes: [...p.incomes, { ...newFI, id: Date.now() }] })); setNewFI({ name: '', amount: 0, type: 'monthly' }); } };
+    const delFI = id => setFixedBudget(p => ({ ...p, incomes: p.incomes.filter(i => i.id !== id) }));
+    const addFE = () => { if (newFE.name && newFE.amount > 0) { setFixedBudget(p => ({ ...p, expenses: [...p.expenses, { ...newFE, id: Date.now() }] })); setNewFE({ name: '', amount: 0, type: 'monthly', category: '' }); } };
+    const delFE = id => setFixedBudget(p => ({ ...p, expenses: p.expenses.filter(e => e.id !== id) }));
+    const addAI = () => { if (newAI.name && newAI.amount > 0) { setActualBudget(p => ({ ...p, incomes: [...p.incomes, { ...newAI, id: Date.now() }] })); setNewAI({ name: '', amount: 0, date: new Date().toISOString().split('T')[0] }); } };
+    const delAI = id => setActualBudget(p => ({ ...p, incomes: p.incomes.filter(i => i.id !== id) }));
+    const addAE = () => { if (newAE.name && newAE.amount > 0) { setActualBudget(p => ({ ...p, expenses: [...p.expenses, { ...newAE, id: Date.now() }] })); setNewAE({ name: '', amount: 0, date: new Date().toISOString().split('T')[0], category: '' }); } };
+    const delAE = id => setActualBudget(p => ({ ...p, expenses: p.expenses.filter(e => e.id !== id) }));
+
+    if (loading) return <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center"><p className="text-xl text-gray-600">Loading...</p></div>;
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+            <div className="max-w-7xl mx-auto">
+                {/* Header */}
+                <div className="flex justify-between items-start mb-6 flex-wrap gap-4">
+                    <h1 className="text-2xl md:text-3xl font-bold text-gray-800">💰 Budget & Investment Tracker</h1>
+                    <div className="flex gap-2">
+                        <button onClick={doExport} className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2 text-sm"><Down />Save Data</button>
+                        <label className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm cursor-pointer"><Up />Load Data<input type="file" accept=".json" onChange={doImport} className="hidden"/></label>
+                    </div>
+                </div>
+
+                {/* Nav */}
+                <div className="flex gap-2 mb-6 flex-wrap">
+                    {[['dashboard','Dashboard'],['budget','📋 Budget'],['actual','📅 Actual'],['money','💵 Money']].map(([v,l]) => 
+                        <button key={v} onClick={() => setView(v)} className={`px-4 py-2 rounded-lg font-semibold ${view === v ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`}>{l}</button>
+                    )}
+                </div>
+
+                {/* Dashboard */}
+                {view === 'dashboard' && (
+                    <div className="space-y-6">
+                        {/* Summary Cards */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-green-500"><p className="text-xs text-gray-500">Net Worth</p><p className="text-xl font-bold">${netWorth.toLocaleString()}</p></div>
+                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-blue-500"><p className="text-xs text-gray-500">RE Equity</p><p className="text-xl font-bold text-blue-600">${totalEquity.toLocaleString(undefined,{maximumFractionDigits:0})}</p></div>
+                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-purple-500"><p className="text-xs text-gray-500">Monthly Cash Flow</p><p className={`text-xl font-bold ${totalCashFlow>=0?'text-green-600':'text-red-600'}`}>${totalCashFlow.toLocaleString(undefined,{maximumFractionDigits:0})}</p></div>
+                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-orange-500"><p className="text-xs text-gray-500">Investment Gain</p><p className={`text-xl font-bold ${invGain>=0?'text-green-600':'text-red-600'}`}>{invGain>=0?'+':''}${invGain.toLocaleString()}</p></div>
+                        </div>
+
+                        {/* Properties */}
+                        <div className="bg-white rounded-xl shadow p-5">
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-lg font-bold">🏠 Real Estate ({realEstate.length})</h2>
+                                <button onClick={addProperty} className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm flex items-center gap-1"><Plus/>Add Property</button>
+                            </div>
+                            
+                            {realEstate.length === 0 ? <p className="text-gray-400 text-center py-6">No properties yet</p> : realEstate.map(p => {
+                                const m = calcPropertyMetrics(p);
+                                const totalTenantRent = (p.tenants || []).reduce((s, t) => s + (t.monthlyRent || 0), 0);
+                                
+                                return (
+                                    <div key={p.id} className="mb-4 p-4 bg-gray-50 rounded-lg border-l-4 border-indigo-500">
+                                        {editingProperty === p.id ? (
+                                            /* EDIT MODE - Full Form */
+                                            <div className="space-y-4">
+                                                {/* Basic Info */}
+                                                <div className="bg-white p-3 rounded-lg">
+                                                    <h4 className="font-semibold text-gray-700 mb-2 text-sm">📍 Basic Information</h4>
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                                        <Input label="Property Name" value={p.name} onChange={e => updateProperty(p.id, 'name', e.target.value)} />
+                                                        <Select label="Type" value={p.propertyType} onChange={e => updateProperty(p.id, 'propertyType', e.target.value)} options={[{value:'single-family',label:'Single Family'},{value:'multi-family',label:'Multi-Family'},{value:'condo',label:'Condo'},{value:'townhouse',label:'Townhouse'},{value:'commercial',label:'Commercial'},{value:'land',label:'Land'}]} />
+                                                        <Select label="Status" value={p.status} onChange={e => updateProperty(p.id, 'status', e.target.value)} options={[{value:'occupied',label:'Occupied'},{value:'vacant',label:'Vacant'},{value:'renovation',label:'Renovation'},{value:'for-sale',label:'For Sale'}]} />
+                                                        <Input label="Units" type="number" value={p.units||''} onChange={e => updateProperty(p.id, 'units', e.target.value)} />
+                                                    </div>
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+                                                        <Input label="Street Address" value={p.address} onChange={e => updateProperty(p.id, 'address', e.target.value)} className="col-span-2" />
+                                                        <Input label="City" value={p.city} onChange={e => updateProperty(p.id, 'city', e.target.value)} />
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <Input label="State" value={p.state} onChange={e => updateProperty(p.id, 'state', e.target.value)} />
+                                                            <Input label="ZIP" value={p.zipCode} onChange={e => updateProperty(p.id, 'zipCode', e.target.value)} />
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mt-2">
+                                                        <Input label="Year Built" value={p.yearBuilt} onChange={e => updateProperty(p.id, 'yearBuilt', e.target.value)} />
+                                                        <Input label="Sq Ft" type="number" value={p.squareFeet||''} onChange={e => updateProperty(p.id, 'squareFeet', e.target.value)} />
+                                                        <Input label="Stories" type="number" value={p.stories||''} onChange={e => updateProperty(p.id, 'stories', e.target.value)} />
+                                                        <Input label="Beds" type="number" value={p.bedrooms||''} onChange={e => updateProperty(p.id, 'bedrooms', e.target.value)} />
+                                                        <Input label="Baths" type="number" value={p.bathrooms||''} onChange={e => updateProperty(p.id, 'bathrooms', e.target.value)} />
+                                                        <Input label="Lot Size" type="number" value={p.lotSize||''} onChange={e => updateProperty(p.id, 'lotSize', e.target.value)} />
+                                                    </div>
+                                                </div>
+
+                                                {/* Ownership */}
+                                                <div className="bg-white p-3 rounded-lg">
+                                                    <h4 className="font-semibold text-gray-700 mb-2 text-sm">👥 Ownership Structure</h4>
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                                        <Select label="Ownership Type" value={p.ownershipType} onChange={e => updateProperty(p.id, 'ownershipType', e.target.value)} options={[{value:'sole',label:'Sole Owner'},{value:'partnership',label:'Partnership'},{value:'syndication',label:'Syndication'},{value:'llc',label:'LLC'},{value:'trust',label:'Trust'},{value:'joint-venture',label:'Joint Venture'}]} />
+                                                        <Input label="My Ownership %" type="number" value={p.ownershipPercentage||''} onChange={e => updateProperty(p.id, 'ownershipPercentage', e.target.value)} />
+                                                        {p.ownershipType !== 'sole' && <>
+                                                            <Input label="Partner Name" value={p.partnerName} onChange={e => updateProperty(p.id, 'partnerName', e.target.value)} />
+                                                            <Input label="Partner %" type="number" value={p.partnerPercentage||''} onChange={e => updateProperty(p.id, 'partnerPercentage', e.target.value)} />
+                                                        </>}
+                                                    </div>
+                                                    {p.ownershipType !== 'sole' && (
+                                                        <div className="mt-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                                                            <h5 className="font-medium text-yellow-800 text-sm mb-2">💰 Split Arrangements</h5>
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                <div>
+                                                                    <Select label="Expense Split" value={p.expenseSplit} onChange={e => updateProperty(p.id, 'expenseSplit', e.target.value)} options={[{value:'by-ownership',label:'By Ownership %'},{value:'50-50',label:'50/50'},{value:'i-pay-all',label:'I Pay All'},{value:'partner-pays-all',label:'Partner Pays All'},{value:'custom',label:'Custom %'}]} />
+                                                                    {p.expenseSplit === 'custom' && <Input label="My Expense %" type="number" value={p.customExpenseSplit||''} onChange={e => updateProperty(p.id, 'customExpenseSplit', e.target.value)} className="mt-2" />}
+                                                                </div>
+                                                                <div>
+                                                                    <Select label="Income Split" value={p.incomeSplit} onChange={e => updateProperty(p.id, 'incomeSplit', e.target.value)} options={[{value:'by-ownership',label:'By Ownership %'},{value:'50-50',label:'50/50'},{value:'custom',label:'Custom %'}]} />
+                                                                    {p.incomeSplit === 'custom' && <Input label="My Income %" type="number" value={p.customIncomeSplit||''} onChange={e => updateProperty(p.id, 'customIncomeSplit', e.target.value)} className="mt-2" />}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Purchase & Value */}
+                                                <div className="bg-white p-3 rounded-lg">
+                                                    <h4 className="font-semibold text-gray-700 mb-2 text-sm">💵 Purchase & Current Value</h4>
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                                        <Input label="Purchase Date" type="date" value={p.purchaseDate} onChange={e => updateProperty(p.id, 'purchaseDate', e.target.value)} />
+                                                        <Input label="Purchase Price" type="number" value={p.purchasePrice||''} onChange={e => updateProperty(p.id, 'purchasePrice', e.target.value)} />
+                                                        <Input label="Closing Costs" type="number" value={p.closingCosts||''} onChange={e => updateProperty(p.id, 'closingCosts', e.target.value)} />
+                                                        <Input label="Rehab Costs" type="number" value={p.rehabCosts||''} onChange={e => updateProperty(p.id, 'rehabCosts', e.target.value)} />
+                                                    </div>
+                                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                                                        <Input label="Current Market Value" type="number" value={p.currentValue||''} onChange={e => updateProperty(p.id, 'currentValue', e.target.value)} />
+                                                        <Input label="Last Appraisal Date" type="date" value={p.lastAppraisalDate} onChange={e => updateProperty(p.id, 'lastAppraisalDate', e.target.value)} />
+                                                        <div className="bg-blue-50 p-2 rounded flex items-center justify-between">
+                                                            <span className="text-xs text-gray-600">Total Investment:</span>
+                                                            <span className="font-bold text-blue-700">${((p.purchasePrice||0)+(p.closingCosts||0)+(p.rehabCosts||0)).toLocaleString()}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Financing */}
+                                                <div className="bg-white p-3 rounded-lg">
+                                                    <h4 className="font-semibold text-gray-700 mb-2 text-sm">🏦 Financing</h4>
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                                        <Select label="Loan Type" value={p.financingType} onChange={e => updateProperty(p.id, 'financingType', e.target.value)} options={[{value:'conventional',label:'Conventional'},{value:'fha',label:'FHA'},{value:'va',label:'VA'},{value:'cash',label:'Cash'},{value:'hard-money',label:'Hard Money'},{value:'private',label:'Private'},{value:'seller-finance',label:'Seller Finance'}]} />
+                                                        <Input label="Loan Amount" type="number" value={p.loanAmount||''} onChange={e => updateProperty(p.id, 'loanAmount', e.target.value)} />
+                                                        <Input label="Interest Rate %" type="number" value={p.interestRate||''} onChange={e => updateProperty(p.id, 'interestRate', e.target.value)} />
+                                                        <Input label="Term (years)" type="number" value={p.loanTerm||''} onChange={e => updateProperty(p.id, 'loanTerm', e.target.value)} />
+                                                    </div>
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+                                                        <Input label="Monthly Mortgage" type="number" value={p.monthlyMortgage||''} onChange={e => updateProperty(p.id, 'monthlyMortgage', e.target.value)} />
+                                                        <Input label="Mortgage Start" type="date" value={p.mortgageStartDate} onChange={e => updateProperty(p.id, 'mortgageStartDate', e.target.value)} />
+                                                        <Input label="Remaining Balance" type="number" value={p.remainingBalance||''} onChange={e => updateProperty(p.id, 'remainingBalance', e.target.value)} />
+                                                        <div className="bg-green-50 p-2 rounded flex items-center justify-between">
+                                                            <span className="text-xs text-gray-600">Equity:</span>
+                                                            <span className="font-bold text-green-700">${((p.currentValue||0)-(p.remainingBalance||0)).toLocaleString()}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Income */}
+                                                <div className="bg-white p-3 rounded-lg">
+                                                    <h4 className="font-semibold text-gray-700 mb-2 text-sm">📈 Monthly Income</h4>
+                                                    {totalTenantRent > 0 && (
+                                                        <div className="mb-2 p-2 bg-green-100 rounded-lg border border-green-300">
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-sm text-green-800">💡 Using Tenant Rent Total:</span>
+                                                                <span className="font-bold text-green-700">${totalTenantRent.toLocaleString()}/mo</span>
+                                                            </div>
+                                                            <p className="text-xs text-green-600 mt-1">This overrides the Monthly Rent field below for cash flow calculations</p>
+                                                        </div>
+                                                    )}
+                                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                                                        <div>
+                                                            <label className="block text-xs text-gray-500 mb-1">Monthly Rent {totalTenantRent > 0 && <span className="text-orange-500">(overridden)</span>}</label>
+                                                            <input type="number" defaultValue={p.monthlyRent||''} onBlur={e => updateProperty(p.id, 'monthlyRent', e.target.value)} className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm ${totalTenantRent > 0 ? 'bg-gray-100 text-gray-400' : ''}`} />
+                                                        </div>
+                                                        <Input label="Other Income" type="number" value={p.otherIncome||''} onChange={e => updateProperty(p.id, 'otherIncome', e.target.value)} />
+                                                        <div>
+                                                            <label className="block text-xs text-gray-500 mb-1">Vacancy % <span className="text-gray-400">(0 = none)</span></label>
+                                                            <input type="number" defaultValue={p.vacancyRate !== undefined ? p.vacancyRate : 5} onBlur={e => updateProperty(p.id, 'vacancyRate', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" min="0" max="100" />
+                                                        </div>
+                                                        <div className="bg-gray-50 p-2 rounded text-center">
+                                                            <span className="text-xs text-gray-500 block">Gross Rent</span>
+                                                            <span className="font-bold text-gray-700">${m.grossRent.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+                                                        </div>
+                                                        <div className="bg-blue-50 p-2 rounded text-center">
+                                                            <span className="text-xs text-gray-500 block">After Vacancy</span>
+                                                            <span className="font-bold text-blue-700">${m.effectiveIncome.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Expenses */}
+                                                <div className="bg-white p-3 rounded-lg">
+                                                    <h4 className="font-semibold text-gray-700 mb-2 text-sm">💸 Operating Expenses</h4>
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                                        <Input label="Property Tax (annual)" type="number" value={p.propertyTax||''} onChange={e => updateProperty(p.id, 'propertyTax', e.target.value)} />
+                                                        <Input label="Insurance (annual)" type="number" value={p.insurance||''} onChange={e => updateProperty(p.id, 'insurance', e.target.value)} />
+                                                        <Input label="HOA (monthly)" type="number" value={p.hoa||''} onChange={e => updateProperty(p.id, 'hoa', e.target.value)} />
+                                                        <div>
+                                                            <label className="block text-xs text-gray-500 mb-1">Property Mgmt</label>
+                                                            <div className="flex gap-1">
+                                                                <input type="number" value={p.propertyManagement||''} onChange={e => updateProperty(p.id, 'propertyManagement', e.target.value)} className="flex-1 px-2 py-2 border border-gray-300 rounded-lg text-sm" />
+                                                                <select value={p.propertyManagementType} onChange={e => updateProperty(p.id, 'propertyManagementType', e.target.value)} className="px-2 py-2 border border-gray-300 rounded-lg bg-white text-sm">
+                                                                    <option value="percentage">%</option>
+                                                                    <option value="fixed">$</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mt-2">
+                                                        <Input label="Maintenance" type="number" value={p.maintenance||''} onChange={e => updateProperty(p.id, 'maintenance', e.target.value)} />
+                                                        <Input label="Repairs" type="number" value={p.repairs||''} onChange={e => updateProperty(p.id, 'repairs', e.target.value)} />
+                                                        <Input label="Utilities" type="number" value={p.utilities||''} onChange={e => updateProperty(p.id, 'utilities', e.target.value)} />
+                                                        <Input label="Landscaping" type="number" value={p.landscaping||''} onChange={e => updateProperty(p.id, 'landscaping', e.target.value)} />
+                                                        <Input label="Pest Control" type="number" value={p.pestControl||''} onChange={e => updateProperty(p.id, 'pestControl', e.target.value)} />
+                                                        <Input label="CapEx Reserve %" type="number" value={p.capexReserve||''} onChange={e => updateProperty(p.id, 'capexReserve', e.target.value)} />
+                                                    </div>
+                                                    <div className="mt-2 bg-red-50 p-2 rounded flex items-center justify-between">
+                                                        <span className="text-xs text-gray-600">Total Operating Expenses (monthly):</span>
+                                                        <span className="font-bold text-red-700">${m.totalOpEx.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Tenants */}
+                                                <div className="bg-white p-3 rounded-lg">
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <h4 className="font-semibold text-gray-700 text-sm">👥 Tenants ({(p.tenants||[]).length})</h4>
+                                                        <button onClick={() => addTenant(p.id)} className="bg-green-600 text-white px-2 py-1 rounded text-xs flex items-center gap-1"><Plus/>Add Tenant</button>
+                                                    </div>
+                                                    {(p.tenants||[]).map((t, idx) => (
+                                                        <div key={t.id} className="p-3 bg-gray-50 rounded-lg border mb-2">
+                                                            <div className="flex justify-between items-start mb-2">
+                                                                <span className="text-xs font-medium text-gray-500">Tenant #{idx + 1}</span>
+                                                                <button onClick={() => deleteTenant(p.id, t.id)} className="text-red-500"><Trash/></button>
+                                                            </div>
+                                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
+                                                                <Input label="Name" value={t.name} onChange={e => updateTenant(p.id, t.id, 'name', e.target.value)} />
+                                                                <Input label="Unit" value={t.unit} onChange={e => updateTenant(p.id, t.id, 'unit', e.target.value)} />
+                                                                <Input label="Monthly Rent" type="number" value={t.monthlyRent||''} onChange={e => updateTenant(p.id, t.id, 'monthlyRent', e.target.value)} />
+                                                                <Select label="Status" value={t.status} onChange={e => updateTenant(p.id, t.id, 'status', e.target.value)} options={[{value:'active',label:'Active'},{value:'late',label:'Late Payment'},{value:'notice',label:'Notice Given'},{value:'eviction',label:'Eviction'},{value:'month-to-month',label:'Month-to-Month'}]} />
+                                                            </div>
+                                                            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-2">
+                                                                <Input label="Lease Start" type="date" value={t.leaseStart} onChange={e => updateTenant(p.id, t.id, 'leaseStart', e.target.value)} />
+                                                                <Input label="Lease End" type="date" value={t.leaseEnd} onChange={e => updateTenant(p.id, t.id, 'leaseEnd', e.target.value)} />
+                                                                <Input label="Security Deposit" type="number" value={t.securityDeposit||''} onChange={e => updateTenant(p.id, t.id, 'securityDeposit', e.target.value)} />
+                                                                <Input label="Rent Due Day" type="number" value={t.rentDueDay||''} onChange={e => updateTenant(p.id, t.id, 'rentDueDay', e.target.value)} />
+                                                                <Input label="Phone" value={t.phone} onChange={e => updateTenant(p.id, t.id, 'phone', e.target.value)} />
+                                                            </div>
+                                                            <div className="grid grid-cols-2 gap-2">
+                                                                <Input label="Email" value={t.email} onChange={e => updateTenant(p.id, t.id, 'email', e.target.value)} />
+                                                                <Input label="Notes" value={t.notes} onChange={e => updateTenant(p.id, t.id, 'notes', e.target.value)} />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                    {(p.tenants||[]).length > 0 && (
+                                                        <div className="mt-2 p-2 bg-green-50 rounded text-sm">
+                                                            <div className="flex justify-between"><span>Total Tenant Rent:</span><span className="font-bold text-green-700">${totalTenantRent.toLocaleString()}/mo</span></div>
+                                                            <div className="flex justify-between text-xs text-gray-500"><span>Total Security Deposits:</span><span>${(p.tenants||[]).reduce((s,t)=>s+(t.securityDeposit||0),0).toLocaleString()}</span></div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Notes */}
+                                                <textarea value={p.notes} onChange={e => updateProperty(p.id, 'notes', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Notes" rows="2" />
+
+                                                {/* Actions */}
+                                                <div className="flex gap-2 justify-end">
+                                                    <button onClick={() => setEditingProperty(null)} className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-1"><Check/>Done</button>
+                                                    <button onClick={() => { deleteProperty(p.id); setEditingProperty(null); }} className="bg-red-600 text-white px-4 py-2 rounded-lg flex items-center gap-1"><Trash/>Delete</button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            /* VIEW MODE - Summary */
+                                            <div>
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div>
+                                                        <h3 className="font-semibold text-gray-800">{p.name}</h3>
+                                                        <div className="flex gap-2 flex-wrap mt-1">
+                                                            <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded">{p.propertyType}</span>
+                                                            <span className={`text-xs px-2 py-0.5 rounded ${p.status==='occupied'?'bg-green-100 text-green-700':p.status==='vacant'?'bg-red-100 text-red-700':'bg-yellow-100 text-yellow-700'}`}>{p.status}</span>
+                                                            {p.ownershipPercentage < 100 && <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded">{p.ownershipPercentage}% owned</span>}
+                                                        </div>
+                                                        {p.address && <p className="text-xs text-gray-500 mt-1">📍 {p.address}{p.city && `, ${p.city}`}{p.state && `, ${p.state}`}</p>}
+                                                    </div>
+                                                    <button onClick={() => setEditingProperty(p.id)} className="text-indigo-600 hover:text-indigo-800"><Edit/></button>
+                                                </div>
+                                                
+                                                {/* Key Metrics */}
+                                                <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mt-3">
+                                                    <div className="bg-white p-2 rounded text-center"><p className="text-xs text-gray-500">Value</p><p className="font-bold">${m.myValue.toLocaleString()}</p></div>
+                                                    <div className="bg-white p-2 rounded text-center"><p className="text-xs text-gray-500">Equity</p><p className="font-bold text-green-600">${m.equity.toLocaleString(undefined,{maximumFractionDigits:0})}</p></div>
+                                                    <div className="bg-white p-2 rounded text-center"><p className="text-xs text-gray-500">Cash Flow</p><p className={`font-bold ${m.cashFlow>=0?'text-green-600':'text-red-600'}`}>${m.cashFlow.toLocaleString(undefined,{maximumFractionDigits:0})}</p></div>
+                                                    <div className="bg-white p-2 rounded text-center"><p className="text-xs text-gray-500">Cap Rate</p><p className={`font-bold ${m.capRate>=8?'text-green-600':m.capRate>=5?'text-yellow-600':'text-red-600'}`}>{m.capRate.toFixed(1)}%</p></div>
+                                                    <div className="bg-white p-2 rounded text-center"><p className="text-xs text-gray-500">Cash on Cash</p><p className={`font-bold ${m.cashOnCash>=10?'text-green-600':m.cashOnCash>=5?'text-yellow-600':'text-red-600'}`}>{m.cashOnCash.toFixed(1)}%</p></div>
+                                                    <div className="bg-white p-2 rounded text-center"><p className="text-xs text-gray-500">DSCR</p><p className={`font-bold ${m.dscr>=1.25?'text-green-600':m.dscr>=1?'text-yellow-600':'text-red-600'}`}>{m.dscr.toFixed(2)}</p></div>
+                                                </div>
+                                                
+                                                {/* Summary row */}
+                                                <div className="grid grid-cols-3 gap-2 mt-2 text-xs">
+                                                    <div className="bg-green-50 p-2 rounded"><span className="text-gray-500">{p.ownershipType!=='sole'?'My ':''}Income:</span> <span className="font-semibold text-green-700">${m.myIncome.toLocaleString(undefined,{maximumFractionDigits:0})}/mo</span></div>
+                                                    <div className="bg-red-50 p-2 rounded"><span className="text-gray-500">{p.ownershipType!=='sole'?'My ':''}Expenses:</span> <span className="font-semibold text-red-700">${(m.myOpEx+m.myMortgage).toLocaleString(undefined,{maximumFractionDigits:0})}/mo</span></div>
+                                                    <div className="bg-blue-50 p-2 rounded"><span className="text-gray-500">LTV:</span> <span className="font-semibold">{m.ltv.toFixed(1)}%</span> | <span className="text-gray-500">GRM:</span> <span className="font-semibold">{m.grm.toFixed(1)}</span></div>
+                                                </div>
+                                                
+                                                {/* Tenant summary */}
+                                                {(p.tenants||[]).length > 0 && (
+                                                    <div className="mt-2 text-xs text-gray-600">
+                                                        👥 {p.tenants.length} tenant{p.tenants.length>1?'s':''} 
+                                                        {p.tenants.some(t=>t.status==='late') && <span className="ml-2 text-orange-600">⚠️ Late payment</span>}
+                                                        {p.tenants.some(t=>t.leaseEnd && new Date(t.leaseEnd) < new Date(Date.now() + 60*24*60*60*1000)) && <span className="ml-2 text-orange-600">⚠️ Lease expiring soon</span>}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                            
+                            {/* Portfolio Summary */}
+                            {realEstate.length > 0 && (
+                                <div className="mt-4 p-3 bg-indigo-50 rounded-lg">
+                                    <h4 className="font-semibold text-indigo-800 mb-2">📊 Portfolio Summary</h4>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                                        <div><span className="text-gray-600">Total Value:</span> <span className="font-bold">${totalValue.toLocaleString()}</span></div>
+                                        <div><span className="text-gray-600">Total Equity:</span> <span className="font-bold text-green-600">${totalEquity.toLocaleString(undefined,{maximumFractionDigits:0})}</span></div>
+                                        <div><span className="text-gray-600">Monthly Cash Flow:</span> <span className={`font-bold ${totalCashFlow>=0?'text-green-600':'text-red-600'}`}>${totalCashFlow.toLocaleString(undefined,{maximumFractionDigits:0})}</span></div>
+                                        <div><span className="text-gray-600">Annual Cash Flow:</span> <span className={`font-bold ${totalCashFlow>=0?'text-green-600':'text-red-600'}`}>${(totalCashFlow*12).toLocaleString(undefined,{maximumFractionDigits:0})}</span></div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Investments */}
+                        <div className="bg-white rounded-xl shadow p-5">
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-lg font-bold">📈 Investments ({companies.length})</h2>
+                                <button onClick={addCompany} className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm flex items-center gap-1"><Plus/>Add</button>
+                            </div>
+                            {companies.length === 0 ? <p className="text-gray-400 text-center py-6">No investments yet</p> : companies.map(c => (
+                                <div key={c.id} className="mb-3 p-4 bg-gray-50 rounded-lg border-l-4 border-purple-500">
+                                    {editingCompany === c.id ? (
+                                        <div className="space-y-3">
+                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                                <Input label="Name" value={c.name} onChange={e => updateCompany(c.id, 'name', e.target.value)} />
+                                                <Input label="Amount Invested" type="number" value={c.investment||''} onChange={e => updateCompany(c.id, 'investment', e.target.value)} />
+                                                <Input label="Current Value" type="number" value={c.currentValue||''} onChange={e => updateCompany(c.id, 'currentValue', e.target.value)} />
+                                            </div>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                                <Input label="Shares" type="number" value={c.shares||''} onChange={e => updateCompany(c.id, 'shares', e.target.value)} />
+                                                <Input label="Purchase Date" type="date" value={c.purchaseDate} onChange={e => updateCompany(c.id, 'purchaseDate', e.target.value)} />
+                                                <Input label="Category" value={c.category} onChange={e => updateCompany(c.id, 'category', e.target.value)} />
+                                                <Input label="Notes" value={c.notes} onChange={e => updateCompany(c.id, 'notes', e.target.value)} />
+                                            </div>
+                                            <div className="flex gap-2 justify-end">
+                                                <button onClick={() => setEditingCompany(null)} className="bg-green-600 text-white px-3 py-1.5 rounded-lg flex items-center gap-1"><Check/>Done</button>
+                                                <button onClick={() => { deleteCompany(c.id); setEditingCompany(null); }} className="bg-red-600 text-white px-3 py-1.5 rounded-lg flex items-center gap-1"><Trash/>Delete</button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <div className="flex justify-between mb-2">
+                                                <div>
+                                                    <span className="font-semibold">{c.name}</span>
+                                                    {c.category && <span className="text-xs ml-2 px-2 py-0.5 bg-gray-200 rounded">{c.category}</span>}
+                                                </div>
+                                                <button onClick={() => setEditingCompany(c.id)} className="text-indigo-600"><Edit/></button>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <div className="bg-white p-2 rounded text-center"><p className="text-xs text-gray-500">Invested</p><p className="font-bold">${(c.investment||0).toLocaleString()}</p></div>
+                                                <div className="bg-white p-2 rounded text-center"><p className="text-xs text-gray-500">Current</p><p className="font-bold text-indigo-600">${(c.currentValue||0).toLocaleString()}</p></div>
+                                                <div className="bg-white p-2 rounded text-center"><p className="text-xs text-gray-500">Gain/Loss</p><p className={`font-bold ${(c.currentValue-c.investment)>=0?'text-green-600':'text-red-600'}`}>{(c.currentValue-c.investment)>=0?'+':''}${((c.currentValue||0)-(c.investment||0)).toLocaleString()}</p></div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Budget View */}
+                {view === 'budget' && (
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-white rounded-xl shadow p-4"><h3 className="font-bold mb-2">Monthly</h3><div className="flex justify-between"><span>Income:</span><span className="font-bold text-green-600">${fixedInc.toLocaleString(undefined,{maximumFractionDigits:0})}</span></div><div className="flex justify-between"><span>Expenses:</span><span className="font-bold text-red-600">${fixedExp.toLocaleString(undefined,{maximumFractionDigits:0})}</span></div><div className="flex justify-between pt-2 border-t mt-2"><span className="font-semibold">Balance:</span><span className={`font-bold text-lg ${fixedBal>=0?'text-blue-600':'text-orange-600'}`}>${fixedBal.toLocaleString(undefined,{maximumFractionDigits:0})}</span></div></div>
+                            <div className="bg-white rounded-xl shadow p-4"><h3 className="font-bold mb-2">Annual</h3><div className="flex justify-between"><span>Income:</span><span className="font-bold text-green-600">${(fixedInc*12).toLocaleString(undefined,{maximumFractionDigits:0})}</span></div><div className="flex justify-between"><span>Expenses:</span><span className="font-bold text-red-600">${(fixedExp*12).toLocaleString(undefined,{maximumFractionDigits:0})}</span></div><div className="flex justify-between pt-2 border-t mt-2"><span className="font-semibold">Balance:</span><span className={`font-bold text-lg ${fixedBal>=0?'text-blue-600':'text-orange-600'}`}>${(fixedBal*12).toLocaleString(undefined,{maximumFractionDigits:0})}</span></div></div>
+                        </div>
+
+                        {/* Quick Add Templates */}
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl shadow p-5 border border-blue-200">
+                            <h3 className="font-bold mb-3 text-indigo-800">📋 Quick Add from Templates</h3>
+                            <p className="text-sm text-gray-600 mb-4">Click any item to add it to your budget. You can edit the amount after adding.</p>
+                            
+                            {/* Income Templates */}
+                            <div className="mb-4">
+                                <h4 className="font-semibold text-green-700 mb-2 text-sm">💵 Common Income Sources</h4>
+                                <div className="flex flex-wrap gap-2">
+                                    {[
+                                        {name:'Primary Salary',type:'monthly',cat:'Employment'},
+                                        {name:'Secondary Job',type:'monthly',cat:'Employment'},
+                                        {name:'Freelance/Contract',type:'monthly',cat:'Self-Employment'},
+                                        {name:'Business Income',type:'monthly',cat:'Self-Employment'},
+                                        {name:'Rental Income',type:'monthly',cat:'Real Estate'},
+                                        {name:'Dividends',type:'monthly',cat:'Investments'},
+                                        {name:'Interest Income',type:'monthly',cat:'Investments'},
+                                        {name:'Social Security',type:'monthly',cat:'Benefits'},
+                                        {name:'Pension',type:'monthly',cat:'Retirement'},
+                                        {name:'401k/IRA Distribution',type:'monthly',cat:'Retirement'},
+                                        {name:'Child Support Received',type:'monthly',cat:'Support'},
+                                        {name:'Alimony Received',type:'monthly',cat:'Support'},
+                                        {name:'Tax Refund',type:'yearly',cat:'Tax'},
+                                        {name:'Bonus',type:'yearly',cat:'Employment'},
+                                        {name:'Side Hustle',type:'monthly',cat:'Other'},
+                                    ].map((t,i)=><button key={i} onClick={()=>{setFixedBudget(p=>({...p,incomes:[...p.incomes,{id:Date.now()+i,name:t.name,amount:0,type:t.type,category:t.cat}]}));}} className="px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-800 rounded-full text-xs font-medium border border-green-300">{t.name} ({t.type})</button>)}
+                                </div>
+                            </div>
+
+                            {/* Expense Templates by Category */}
+                            <h4 className="font-semibold text-red-700 mb-2 text-sm">💸 Common Expenses by Category</h4>
+                            
+                            {/* Housing */}
+                            <div className="mb-3">
+                                <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">🏠 Housing</span>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {[
+                                        {name:'Rent/Mortgage',type:'monthly'},{name:'Property Tax',type:'yearly'},{name:'HOA Fees',type:'monthly'},
+                                        {name:'Home Insurance',type:'yearly'},{name:'Renters Insurance',type:'yearly'},{name:'Home Warranty',type:'yearly'},
+                                        {name:'Lawn Care/Landscaping',type:'monthly'},{name:'Pest Control',type:'monthly'},{name:'Home Maintenance',type:'monthly'},
+                                        {name:'Home Repairs Fund',type:'monthly'},{name:'Cleaning Service',type:'monthly'},{name:'Security System',type:'monthly'},
+                                        {name:'Furniture/Decor',type:'monthly'},{name:'Appliance Replacement',type:'yearly'},
+                                    ].map((t,i)=><button key={i} onClick={()=>{setFixedBudget(p=>({...p,expenses:[...p.expenses,{id:Date.now()+i,name:t.name,amount:0,type:t.type,category:'Housing'}]}));}} className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-800 rounded text-xs border border-red-200">{t.name}</button>)}
+                                </div>
+                            </div>
+
+                            {/* Utilities */}
+                            <div className="mb-3">
+                                <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">💡 Utilities</span>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {[
+                                        {name:'Electricity',type:'monthly'},{name:'Gas/Heating',type:'monthly'},{name:'Water/Sewer',type:'monthly'},
+                                        {name:'Trash/Recycling',type:'monthly'},{name:'Internet',type:'monthly'},{name:'Cable/Satellite TV',type:'monthly'},
+                                        {name:'Phone - Landline',type:'monthly'},{name:'Cell Phone',type:'monthly'},{name:'Streaming Services',type:'monthly'},
+                                    ].map((t,i)=><button key={i} onClick={()=>{setFixedBudget(p=>({...p,expenses:[...p.expenses,{id:Date.now()+i+100,name:t.name,amount:0,type:t.type,category:'Utilities'}]}));}} className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-800 rounded text-xs border border-red-200">{t.name}</button>)}
+                                </div>
+                            </div>
+
+                            {/* Transportation */}
+                            <div className="mb-3">
+                                <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">🚗 Transportation</span>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {[
+                                        {name:'Car Payment',type:'monthly'},{name:'Car Insurance',type:'monthly'},{name:'Gas/Fuel',type:'monthly'},
+                                        {name:'Car Maintenance',type:'monthly'},{name:'Car Repairs Fund',type:'monthly'},{name:'Registration/Tags',type:'yearly'},
+                                        {name:'Inspection',type:'yearly'},{name:'Parking',type:'monthly'},{name:'Tolls',type:'monthly'},
+                                        {name:'Public Transit',type:'monthly'},{name:'Uber/Lyft',type:'monthly'},{name:'Car Wash',type:'monthly'},
+                                        {name:'AAA/Roadside Assistance',type:'yearly'},
+                                    ].map((t,i)=><button key={i} onClick={()=>{setFixedBudget(p=>({...p,expenses:[...p.expenses,{id:Date.now()+i+200,name:t.name,amount:0,type:t.type,category:'Transportation'}]}));}} className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-800 rounded text-xs border border-red-200">{t.name}</button>)}
+                                </div>
+                            </div>
+
+                            {/* Food */}
+                            <div className="mb-3">
+                                <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">🍽️ Food</span>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {[
+                                        {name:'Groceries',type:'monthly'},{name:'Dining Out',type:'monthly'},{name:'Coffee/Drinks',type:'monthly'},
+                                        {name:'Fast Food',type:'monthly'},{name:'Work Lunches',type:'monthly'},{name:'Food Delivery',type:'monthly'},
+                                        {name:'Alcohol/Bars',type:'monthly'},{name:'Meal Prep/Kit Services',type:'monthly'},
+                                    ].map((t,i)=><button key={i} onClick={()=>{setFixedBudget(p=>({...p,expenses:[...p.expenses,{id:Date.now()+i+300,name:t.name,amount:0,type:t.type,category:'Food'}]}));}} className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-800 rounded text-xs border border-red-200">{t.name}</button>)}
+                                </div>
+                            </div>
+
+                            {/* Healthcare */}
+                            <div className="mb-3">
+                                <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">🏥 Healthcare</span>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {[
+                                        {name:'Health Insurance Premium',type:'monthly'},{name:'Dental Insurance',type:'monthly'},{name:'Vision Insurance',type:'monthly'},
+                                        {name:'Life Insurance',type:'monthly'},{name:'HSA Contribution',type:'monthly'},{name:'FSA Contribution',type:'yearly'},
+                                        {name:'Prescriptions',type:'monthly'},{name:'Doctor Copays',type:'monthly'},{name:'Dental Visits',type:'yearly'},
+                                        {name:'Vision/Glasses/Contacts',type:'yearly'},{name:'Therapy/Counseling',type:'monthly'},{name:'Gym/Fitness',type:'monthly'},
+                                        {name:'Vitamins/Supplements',type:'monthly'},{name:'Medical Equipment',type:'yearly'},
+                                    ].map((t,i)=><button key={i} onClick={()=>{setFixedBudget(p=>({...p,expenses:[...p.expenses,{id:Date.now()+i+400,name:t.name,amount:0,type:t.type,category:'Healthcare'}]}));}} className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-800 rounded text-xs border border-red-200">{t.name}</button>)}
+                                </div>
+                            </div>
+
+                            {/* Insurance */}
+                            <div className="mb-3">
+                                <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">🛡️ Insurance (Other)</span>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {[
+                                        {name:'Umbrella Insurance',type:'yearly'},{name:'Disability Insurance',type:'monthly'},{name:'Long-Term Care Insurance',type:'monthly'},
+                                        {name:'Pet Insurance',type:'monthly'},{name:'Travel Insurance',type:'yearly'},{name:'Identity Theft Protection',type:'monthly'},
+                                    ].map((t,i)=><button key={i} onClick={()=>{setFixedBudget(p=>({...p,expenses:[...p.expenses,{id:Date.now()+i+500,name:t.name,amount:0,type:t.type,category:'Insurance'}]}));}} className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-800 rounded text-xs border border-red-200">{t.name}</button>)}
+                                </div>
+                            </div>
+
+                            {/* Debt */}
+                            <div className="mb-3">
+                                <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">💳 Debt Payments</span>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {[
+                                        {name:'Credit Card Payment',type:'monthly'},{name:'Student Loan',type:'monthly'},{name:'Personal Loan',type:'monthly'},
+                                        {name:'Medical Debt',type:'monthly'},{name:'Back Taxes',type:'monthly'},{name:'Other Debt Payment',type:'monthly'},
+                                    ].map((t,i)=><button key={i} onClick={()=>{setFixedBudget(p=>({...p,expenses:[...p.expenses,{id:Date.now()+i+600,name:t.name,amount:0,type:t.type,category:'Debt'}]}));}} className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-800 rounded text-xs border border-red-200">{t.name}</button>)}
+                                </div>
+                            </div>
+
+                            {/* Savings & Investments */}
+                            <div className="mb-3">
+                                <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">💰 Savings & Investments</span>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {[
+                                        {name:'Emergency Fund',type:'monthly'},{name:'401k Contribution',type:'monthly'},{name:'IRA Contribution',type:'monthly'},
+                                        {name:'Roth IRA',type:'monthly'},{name:'Brokerage Account',type:'monthly'},{name:'Kids College Fund (529)',type:'monthly'},
+                                        {name:'Vacation Fund',type:'monthly'},{name:'Down Payment Savings',type:'monthly'},{name:'General Savings',type:'monthly'},
+                                    ].map((t,i)=><button key={i} onClick={()=>{setFixedBudget(p=>({...p,expenses:[...p.expenses,{id:Date.now()+i+700,name:t.name,amount:0,type:t.type,category:'Savings'}]}));}} className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-800 rounded text-xs border border-red-200">{t.name}</button>)}
+                                </div>
+                            </div>
+
+                            {/* Personal */}
+                            <div className="mb-3">
+                                <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">👤 Personal Care</span>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {[
+                                        {name:'Haircuts/Salon',type:'monthly'},{name:'Personal Grooming',type:'monthly'},{name:'Cosmetics/Skincare',type:'monthly'},
+                                        {name:'Clothing',type:'monthly'},{name:'Shoes',type:'yearly'},{name:'Dry Cleaning',type:'monthly'},
+                                        {name:'Spa/Massage',type:'monthly'},
+                                    ].map((t,i)=><button key={i} onClick={()=>{setFixedBudget(p=>({...p,expenses:[...p.expenses,{id:Date.now()+i+800,name:t.name,amount:0,type:t.type,category:'Personal'}]}));}} className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-800 rounded text-xs border border-red-200">{t.name}</button>)}
+                                </div>
+                            </div>
+
+                            {/* Children/Family */}
+                            <div className="mb-3">
+                                <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">👨‍👩‍👧‍👦 Children & Family</span>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {[
+                                        {name:'Daycare/Childcare',type:'monthly'},{name:'School Tuition',type:'monthly'},{name:'School Supplies',type:'yearly'},
+                                        {name:'School Lunches',type:'monthly'},{name:'Kids Activities/Sports',type:'monthly'},{name:'Kids Allowance',type:'monthly'},
+                                        {name:'Babysitter',type:'monthly'},{name:'Diapers/Formula',type:'monthly'},{name:'Kids Clothing',type:'monthly'},
+                                        {name:'Toys/Games',type:'monthly'},{name:'Summer Camp',type:'yearly'},{name:'Child Support Payment',type:'monthly'},
+                                        {name:'Alimony Payment',type:'monthly'},{name:'Elder Care',type:'monthly'},
+                                    ].map((t,i)=><button key={i} onClick={()=>{setFixedBudget(p=>({...p,expenses:[...p.expenses,{id:Date.now()+i+900,name:t.name,amount:0,type:t.type,category:'Family'}]}));}} className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-800 rounded text-xs border border-red-200">{t.name}</button>)}
+                                </div>
+                            </div>
+
+                            {/* Pets */}
+                            <div className="mb-3">
+                                <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">🐾 Pets</span>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {[
+                                        {name:'Pet Food',type:'monthly'},{name:'Pet Insurance',type:'monthly'},{name:'Vet Visits',type:'yearly'},
+                                        {name:'Pet Medications',type:'monthly'},{name:'Pet Grooming',type:'monthly'},{name:'Pet Boarding/Sitting',type:'monthly'},
+                                        {name:'Pet Supplies',type:'monthly'},
+                                    ].map((t,i)=><button key={i} onClick={()=>{setFixedBudget(p=>({...p,expenses:[...p.expenses,{id:Date.now()+i+1000,name:t.name,amount:0,type:t.type,category:'Pets'}]}));}} className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-800 rounded text-xs border border-red-200">{t.name}</button>)}
+                                </div>
+                            </div>
+
+                            {/* Entertainment & Subscriptions */}
+                            <div className="mb-3">
+                                <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">🎬 Entertainment & Subscriptions</span>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {[
+                                        {name:'Netflix',type:'monthly'},{name:'Hulu',type:'monthly'},{name:'Disney+',type:'monthly'},
+                                        {name:'HBO Max',type:'monthly'},{name:'Amazon Prime',type:'yearly'},{name:'Spotify/Apple Music',type:'monthly'},
+                                        {name:'YouTube Premium',type:'monthly'},{name:'Gaming Subscriptions',type:'monthly'},{name:'Audible/Books',type:'monthly'},
+                                        {name:'Newspapers/Magazines',type:'monthly'},{name:'Movies/Theater',type:'monthly'},{name:'Concerts/Events',type:'monthly'},
+                                        {name:'Sports Tickets',type:'monthly'},{name:'Hobbies',type:'monthly'},{name:'Video Games',type:'monthly'},
+                                    ].map((t,i)=><button key={i} onClick={()=>{setFixedBudget(p=>({...p,expenses:[...p.expenses,{id:Date.now()+i+1100,name:t.name,amount:0,type:t.type,category:'Entertainment'}]}));}} className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-800 rounded text-xs border border-red-200">{t.name}</button>)}
+                                </div>
+                            </div>
+
+                            {/* Education */}
+                            <div className="mb-3">
+                                <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">📚 Education & Professional</span>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {[
+                                        {name:'College Tuition',type:'yearly'},{name:'Online Courses',type:'monthly'},{name:'Professional Certifications',type:'yearly'},
+                                        {name:'Books/Learning Materials',type:'monthly'},{name:'Professional Dues',type:'yearly'},{name:'Union Dues',type:'monthly'},
+                                        {name:'Conferences',type:'yearly'},{name:'Work Supplies',type:'monthly'},{name:'Coworking Space',type:'monthly'},
+                                    ].map((t,i)=><button key={i} onClick={()=>{setFixedBudget(p=>({...p,expenses:[...p.expenses,{id:Date.now()+i+1200,name:t.name,amount:0,type:t.type,category:'Education'}]}));}} className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-800 rounded text-xs border border-red-200">{t.name}</button>)}
+                                </div>
+                            </div>
+
+                            {/* Giving */}
+                            <div className="mb-3">
+                                <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">🎁 Giving & Gifts</span>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {[
+                                        {name:'Charitable Donations',type:'monthly'},{name:'Church/Tithe',type:'monthly'},{name:'Birthday Gifts',type:'monthly'},
+                                        {name:'Holiday Gifts',type:'yearly'},{name:'Wedding Gifts',type:'yearly'},{name:'Baby Shower Gifts',type:'yearly'},
+                                    ].map((t,i)=><button key={i} onClick={()=>{setFixedBudget(p=>({...p,expenses:[...p.expenses,{id:Date.now()+i+1300,name:t.name,amount:0,type:t.type,category:'Giving'}]}));}} className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-800 rounded text-xs border border-red-200">{t.name}</button>)}
+                                </div>
+                            </div>
+
+                            {/* Travel */}
+                            <div className="mb-3">
+                                <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">✈️ Travel & Vacation</span>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {[
+                                        {name:'Vacation Fund',type:'monthly'},{name:'Flights',type:'yearly'},{name:'Hotels/Lodging',type:'yearly'},
+                                        {name:'Vacation Activities',type:'yearly'},{name:'Travel Insurance',type:'yearly'},{name:'Passport/Visa Fees',type:'yearly'},
+                                    ].map((t,i)=><button key={i} onClick={()=>{setFixedBudget(p=>({...p,expenses:[...p.expenses,{id:Date.now()+i+1400,name:t.name,amount:0,type:t.type,category:'Travel'}]}));}} className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-800 rounded text-xs border border-red-200">{t.name}</button>)}
+                                </div>
+                            </div>
+
+                            {/* Taxes & Fees */}
+                            <div className="mb-3">
+                                <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">📊 Taxes & Fees</span>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {[
+                                        {name:'Federal Tax Withholding',type:'monthly'},{name:'State Tax Withholding',type:'monthly'},{name:'Self-Employment Tax',type:'monthly'},
+                                        {name:'Quarterly Estimated Taxes',type:'monthly'},{name:'Tax Preparation',type:'yearly'},{name:'Bank Fees',type:'monthly'},
+                                        {name:'ATM Fees',type:'monthly'},{name:'Investment Fees',type:'yearly'},{name:'Legal Fees',type:'yearly'},
+                                        {name:'Accounting Fees',type:'yearly'},
+                                    ].map((t,i)=><button key={i} onClick={()=>{setFixedBudget(p=>({...p,expenses:[...p.expenses,{id:Date.now()+i+1500,name:t.name,amount:0,type:t.type,category:'Taxes'}]}));}} className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-800 rounded text-xs border border-red-200">{t.name}</button>)}
+                                </div>
+                            </div>
+
+                            {/* Miscellaneous */}
+                            <div className="mb-1">
+                                <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">📦 Miscellaneous</span>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {[
+                                        {name:'Cash/Misc Spending',type:'monthly'},{name:'Buffer/Unexpected',type:'monthly'},{name:'Storage Unit',type:'monthly'},
+                                        {name:'PO Box',type:'yearly'},{name:'Safety Deposit Box',type:'yearly'},{name:'Other',type:'monthly'},
+                                    ].map((t,i)=><button key={i} onClick={()=>{setFixedBudget(p=>({...p,expenses:[...p.expenses,{id:Date.now()+i+1600,name:t.name,amount:0,type:t.type,category:'Misc'}]}));}} className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-800 rounded text-xs border border-red-200">{t.name}</button>)}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow p-5">
+                            <h3 className="font-bold mb-3">Fixed Income</h3>
+                            <div className="grid grid-cols-4 gap-2 mb-3">
+                                <input value={newFI.name} onChange={e=>setNewFI(p=>({...p,name:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Name"/>
+                                <input type="number" value={newFI.amount||''} onChange={e=>setNewFI(p=>({...p,amount:parseFloat(e.target.value)||0}))} className="px-3 py-2 border rounded-lg" placeholder="Amount"/>
+                                <select value={newFI.type} onChange={e=>setNewFI(p=>({...p,type:e.target.value}))} className="px-3 py-2 border rounded-lg bg-white"><option value="weekly">Weekly</option><option value="biweekly">Bi-Weekly</option><option value="semimonthly">Semi-Monthly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="semiannually">Semi-Annually</option><option value="yearly">Yearly</option></select>
+                                <button onClick={addFI} className="bg-green-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
+                            </div>
+                            <div className="space-y-2">{fixedBudget.incomes.map(i=>(
+                                <div key={i.id} className="flex justify-between items-center bg-green-50 p-3 rounded-lg flex-wrap gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-medium">{i.name}</span>
+                                        {i.category&&<span className="text-xs bg-gray-200 px-2 py-0.5 rounded">{i.category}</span>}
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-gray-500">$</span>
+                                        <input type="number" defaultValue={i.amount||''} onBlur={e=>{const amt=parseFloat(e.target.value)||0;setFixedBudget(p=>({...p,incomes:p.incomes.map(x=>x.id===i.id?{...x,amount:amt}:x)}));}} className="w-24 px-2 py-1 border rounded text-sm text-right" placeholder="0"/>
+                                        <select value={i.type} onChange={e=>setFixedBudget(p=>({...p,incomes:p.incomes.map(x=>x.id===i.id?{...x,type:e.target.value}:x)}))} className="px-2 py-1 border rounded text-sm bg-white">
+                                            <option value="weekly">Weekly</option>
+                                            <option value="biweekly">Bi-Weekly</option>
+                                            <option value="semimonthly">Semi-Monthly</option>
+                                            <option value="monthly">Monthly</option>
+                                            <option value="quarterly">Quarterly</option>
+                                            <option value="semiannually">Semi-Annually</option>
+                                            <option value="yearly">Yearly</option>
+                                        </select>
+                                        {i.type!=='monthly'&&i.amount>0&&<span className="text-xs text-gray-500 whitespace-nowrap">≈${toMonthly(i.amount,i.type).toLocaleString(undefined,{maximumFractionDigits:0})}/mo</span>}
+                                        <button onClick={()=>delFI(i.id)} className="text-red-500 ml-1"><Trash/></button>
+                                    </div>
+                                </div>
+                            ))}</div>
+                        </div>
+                        <div className="bg-white rounded-xl shadow p-5">
+                            <h3 className="font-bold mb-3">Fixed Expenses</h3>
+                            <div className="grid grid-cols-5 gap-2 mb-3">
+                                <input value={newFE.name} onChange={e=>setNewFE(p=>({...p,name:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Name"/>
+                                <input type="number" value={newFE.amount||''} onChange={e=>setNewFE(p=>({...p,amount:parseFloat(e.target.value)||0}))} className="px-3 py-2 border rounded-lg" placeholder="Amount"/>
+                                <select value={newFE.type} onChange={e=>setNewFE(p=>({...p,type:e.target.value}))} className="px-3 py-2 border rounded-lg bg-white"><option value="weekly">Weekly</option><option value="biweekly">Bi-Weekly</option><option value="semimonthly">Semi-Monthly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="semiannually">Semi-Annually</option><option value="yearly">Yearly</option></select>
+                                <input value={newFE.category} onChange={e=>setNewFE(p=>({...p,category:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Category"/>
+                                <button onClick={addFE} className="bg-indigo-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
+                            </div>
+                            <div className="space-y-2">{fixedBudget.expenses.map(e=>(
+                                <div key={e.id} className="flex justify-between items-center bg-red-50 p-3 rounded-lg flex-wrap gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-medium">{e.name}</span>
+                                        {e.category&&<span className="text-xs bg-gray-200 px-2 py-0.5 rounded">{e.category}</span>}
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-gray-500">$</span>
+                                        <input type="number" defaultValue={e.amount||''} onBlur={ev=>{const amt=parseFloat(ev.target.value)||0;setFixedBudget(p=>({...p,expenses:p.expenses.map(x=>x.id===e.id?{...x,amount:amt}:x)}));}} className="w-24 px-2 py-1 border rounded text-sm text-right" placeholder="0"/>
+                                        <select value={e.type} onChange={ev=>setFixedBudget(p=>({...p,expenses:p.expenses.map(x=>x.id===e.id?{...x,type:ev.target.value}:x)}))} className="px-2 py-1 border rounded text-sm bg-white">
+                                            <option value="weekly">Weekly</option>
+                                            <option value="biweekly">Bi-Weekly</option>
+                                            <option value="semimonthly">Semi-Monthly</option>
+                                            <option value="monthly">Monthly</option>
+                                            <option value="quarterly">Quarterly</option>
+                                            <option value="semiannually">Semi-Annually</option>
+                                            <option value="yearly">Yearly</option>
+                                        </select>
+                                        {e.type!=='monthly'&&e.amount>0&&<span className="text-xs text-gray-500 whitespace-nowrap">≈${toMonthly(e.amount,e.type).toLocaleString(undefined,{maximumFractionDigits:0})}/mo</span>}
+                                        <button onClick={()=>delFE(e.id)} className="text-red-500 ml-1"><Trash/></button>
+                                    </div>
+                                </div>
+                            ))}</div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Actual Tracking */}
+                {view === 'actual' && (
+                    <div className="space-y-6">
+                        <div className="bg-white rounded-xl shadow p-4 flex items-center justify-between">
+                            <button onClick={()=>changeMonth(-1)} className="p-2 hover:bg-gray-100 rounded-lg"><Left/></button>
+                            <h2 className="text-xl font-bold">{fmtMonth(month)}</h2>
+                            <button onClick={()=>changeMonth(1)} className="p-2 hover:bg-gray-100 rounded-lg"><Right/></button>
+                        </div>
+                        
+                        {/* Summary Cards */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="bg-green-50 rounded-lg p-4 border-l-4 border-green-500">
+                                <p className="text-xs text-gray-600">Actual Income</p>
+                                <p className="text-xl font-bold text-green-700">${actualInc.toLocaleString()}</p>
+                                <p className="text-xs text-gray-500">Budget: ${fixedInc.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
+                            </div>
+                            <div className="bg-red-50 rounded-lg p-4 border-l-4 border-red-500">
+                                <p className="text-xs text-gray-600">Actual Expenses</p>
+                                <p className="text-xl font-bold text-red-700">${actualExp.toLocaleString()}</p>
+                                <p className="text-xs text-gray-500">Budget: ${fixedExp.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
+                            </div>
+                            <div className={`rounded-lg p-4 border-l-4 ${actualBal>=0?'bg-blue-50 border-blue-500':'bg-orange-50 border-orange-500'}`}>
+                                <p className="text-xs text-gray-600">Balance</p>
+                                <p className={`text-xl font-bold ${actualBal>=0?'text-blue-700':'text-orange-700'}`}>${actualBal.toLocaleString()}</p>
+                                <p className="text-xs text-gray-500">Budget: ${fixedBal.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
+                            </div>
+                            <div className={`rounded-lg p-4 border-l-4 ${(actualBal-fixedBal)>=0?'bg-green-50 border-green-500':'bg-red-50 border-red-500'}`}>
+                                <p className="text-xs text-gray-600">vs Budget</p>
+                                <p className={`text-xl font-bold ${(actualBal-fixedBal)>=0?'text-green-700':'text-red-700'}`}>{(actualBal-fixedBal)>=0?'+':''}${(actualBal-fixedBal).toLocaleString(undefined,{maximumFractionDigits:0})}</p>
+                            </div>
+                        </div>
+
+                        {/* Budget Items to Track */}
+                        <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl shadow p-5 border border-green-200">
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className="font-bold text-green-800">📋 Expected Income from Budget</h3>
+                                <span className="text-sm text-gray-500">Click to add to this month</span>
+                            </div>
+                            {fixedBudget.incomes.length === 0 ? (
+                                <p className="text-gray-500 text-sm">No income items in budget. Add some in the Budget tab.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {fixedBudget.incomes.map(function(i) {
+                                        var monthlyAmt = toMonthly(i.amount || 0, i.type);
+                                        var isAdded = byMonth(actualBudget.incomes, month).some(function(a) { return a.name === i.name; });
+                                        return (
+                                            <div key={i.id} className={'flex justify-between items-center p-3 rounded-lg ' + (isAdded ? 'bg-green-200' : 'bg-white')}>
+                                                <div className="flex items-center gap-2">
+                                                    {isAdded && <span className="text-green-600">✓</span>}
+                                                    <span className={isAdded ? 'line-through text-gray-500' : ''}>{i.name}</span>
+                                                    {i.category && <span className="text-xs bg-gray-200 px-2 py-0.5 rounded">{i.category}</span>}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold">${monthlyAmt.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+                                                    {!isAdded && (
+                                                        <button 
+                                                            type="button"
+                                                            onClick={function() {
+                                                                var dateStr = month.getFullYear() + '-' + String(month.getMonth() + 1).padStart(2, '0') + '-01';
+                                                                var newItem = { id: Date.now(), name: i.name, amount: monthlyAmt, date: dateStr, category: i.category || '' };
+                                                                setActualBudget(function(prev) {
+                                                                    return {...prev, incomes: prev.incomes.concat([newItem])};
+                                                                });
+                                                            }}
+                                                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
+                                                        >
+                                                            Add
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-xl shadow p-5 border border-red-200">
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className="font-bold text-red-800">📋 Expected Expenses from Budget</h3>
+                                <span className="text-sm text-gray-500">Click to add to this month</span>
+                            </div>
+                            {fixedBudget.expenses.length === 0 ? (
+                                <p className="text-gray-500 text-sm">No expense items in budget. Add some in the Budget tab.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {fixedBudget.expenses.map(function(e) {
+                                        var monthlyAmt = toMonthly(e.amount || 0, e.type);
+                                        var isAdded = byMonth(actualBudget.expenses, month).some(function(a) { return a.name === e.name; });
+                                        return (
+                                            <div key={e.id} className={'flex justify-between items-center p-3 rounded-lg ' + (isAdded ? 'bg-red-200' : 'bg-white')}>
+                                                <div className="flex items-center gap-2">
+                                                    {isAdded && <span className="text-red-600">✓</span>}
+                                                    <span className={isAdded ? 'line-through text-gray-500' : ''}>{e.name}</span>
+                                                    {e.category && <span className="text-xs bg-gray-200 px-2 py-0.5 rounded">{e.category}</span>}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold">${monthlyAmt.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+                                                    {!isAdded && (
+                                                        <button 
+                                                            type="button"
+                                                            onClick={function() {
+                                                                var dateStr = month.getFullYear() + '-' + String(month.getMonth() + 1).padStart(2, '0') + '-01';
+                                                                var newItem = { id: Date.now(), name: e.name, amount: monthlyAmt, date: dateStr, category: e.category || '' };
+                                                                setActualBudget(function(prev) {
+                                                                    return {...prev, expenses: prev.expenses.concat([newItem])};
+                                                                });
+                                                            }}
+                                                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
+                                                        >
+                                                            Add
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Actual Income This Month */}
+                        <div className="bg-white rounded-xl shadow p-5">
+                            <h3 className="font-bold mb-3">✅ Actual Income This Month</h3>
+                            <div className="grid grid-cols-4 gap-2 mb-3">
+                                <input value={newAI.name} onChange={e=>setNewAI(p=>({...p,name:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Name"/>
+                                <input type="number" value={newAI.amount||''} onChange={e=>setNewAI(p=>({...p,amount:parseFloat(e.target.value)||0}))} className="px-3 py-2 border rounded-lg" placeholder="Amount"/>
+                                <input type="date" value={newAI.date} onChange={e=>setNewAI(p=>({...p,date:e.target.value}))} className="px-3 py-2 border rounded-lg"/>
+                                <button onClick={addAI} className="bg-green-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
+                            </div>
+                            <div className="space-y-2">
+                                {byMonth(actualBudget.incomes,month).map(i=>(
+                                    <div key={i.id} className="flex justify-between items-center bg-green-50 p-3 rounded-lg">
+                                        <div className="flex items-center gap-2">
+                                            <span>{i.name}</span>
+                                            <span className="text-sm text-gray-500">{new Date(i.date).toLocaleDateString()}</span>
+                                            {i.category&&<span className="text-xs bg-gray-200 px-2 py-0.5 rounded">{i.category}</span>}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-gray-500">$</span>
+                                            <input 
+                                                type="number" 
+                                                defaultValue={i.amount} 
+                                                onBlur={e=>{const amt=parseFloat(e.target.value)||0;setActualBudget(p=>({...p,incomes:p.incomes.map(x=>x.id===i.id?{...x,amount:amt}:x)}));}}
+                                                className="w-24 px-2 py-1 border rounded text-sm text-right"
+                                            />
+                                            <button onClick={()=>delAI(i.id)} className="text-red-500"><Trash/></button>
+                                        </div>
+                                    </div>
+                                ))}
+                                {byMonth(actualBudget.incomes,month).length === 0 && <p className="text-gray-400 text-center py-4">No income recorded this month</p>}
+                            </div>
+                        </div>
+
+                        {/* Actual Expenses This Month */}
+                        <div className="bg-white rounded-xl shadow p-5">
+                            <h3 className="font-bold mb-3">✅ Actual Expenses This Month</h3>
+                            <div className="grid grid-cols-5 gap-2 mb-3">
+                                <input value={newAE.name} onChange={e=>setNewAE(p=>({...p,name:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Name"/>
+                                <input type="number" value={newAE.amount||''} onChange={e=>setNewAE(p=>({...p,amount:parseFloat(e.target.value)||0}))} className="px-3 py-2 border rounded-lg" placeholder="Amount"/>
+                                <input type="date" value={newAE.date} onChange={e=>setNewAE(p=>({...p,date:e.target.value}))} className="px-3 py-2 border rounded-lg"/>
+                                <input value={newAE.category} onChange={e=>setNewAE(p=>({...p,category:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Category"/>
+                                <button onClick={addAE} className="bg-indigo-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
+                            </div>
+                            <div className="space-y-2">
+                                {byMonth(actualBudget.expenses,month).map(e=>(
+                                    <div key={e.id} className="flex justify-between items-center bg-red-50 p-3 rounded-lg">
+                                        <div className="flex items-center gap-2">
+                                            <span>{e.name}</span>
+                                            <span className="text-sm text-gray-500">{new Date(e.date).toLocaleDateString()}</span>
+                                            {e.category&&<span className="text-xs bg-gray-200 px-2 py-0.5 rounded">{e.category}</span>}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-gray-500">$</span>
+                                            <input 
+                                                type="number" 
+                                                defaultValue={e.amount} 
+                                                onBlur={ev=>{const amt=parseFloat(ev.target.value)||0;setActualBudget(p=>({...p,expenses:p.expenses.map(x=>x.id===e.id?{...x,amount:amt}:x)}));}}
+                                                className="w-24 px-2 py-1 border rounded text-sm text-right"
+                                            />
+                                            <button onClick={()=>delAE(e.id)} className="text-red-500"><Trash/></button>
+                                        </div>
+                                    </div>
+                                ))}
+                                {byMonth(actualBudget.expenses,month).length === 0 && <p className="text-gray-400 text-center py-4">No expenses recorded this month</p>}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Money Management */}
+                {view === 'money' && (
+                    <div className="space-y-6">
+                        {/* Summary */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-red-500"><p className="text-xs text-gray-500">Total Borrowed</p><p className="text-xl font-bold text-red-600">${totalBorrowed.toLocaleString()}</p><p className="text-xs text-gray-400">Interest: ${totalMonthlyInterest.toLocaleString()}/mo</p></div>
+                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-green-500"><p className="text-xs text-gray-500">General Income Pot</p><p className="text-xl font-bold text-green-600">${generalPot.toLocaleString()}</p></div>
+                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-blue-500"><p className="text-xs text-gray-500">Total Transferred</p><p className="text-xl font-bold">${totalTransfersOut.toLocaleString()}</p></div>
+                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-purple-500"><p className="text-xs text-gray-500">Net Worth</p><p className="text-xl font-bold">${netWorth.toLocaleString()}</p></div>
+                        </div>
+
+                        {/* Borrowed Money */}
+                        <div className="bg-white rounded-xl shadow p-5">
+                            <h3 className="font-bold mb-3">💳 Borrowed Money ({borrowedMoney.length})</h3>
+                            <div className="grid grid-cols-5 gap-2 mb-3">
+                                <input value={newBorrowed.lenderName} onChange={e=>setNewBorrowed(p=>({...p,lenderName:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Lender"/>
+                                <input type="number" value={newBorrowed.amount||''} onChange={e=>setNewBorrowed(p=>({...p,amount:parseFloat(e.target.value)||0}))} className="px-3 py-2 border rounded-lg" placeholder="Amount"/>
+                                <input type="number" value={newBorrowed.monthlyInterest||''} onChange={e=>setNewBorrowed(p=>({...p,monthlyInterest:parseFloat(e.target.value)||0}))} className="px-3 py-2 border rounded-lg" placeholder="Monthly Interest"/>
+                                <input type="date" value={newBorrowed.startDate} onChange={e=>setNewBorrowed(p=>({...p,startDate:e.target.value}))} className="px-3 py-2 border rounded-lg"/>
+                                <button onClick={addBorrowed} className="bg-red-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
+                            </div>
+                            <div className="space-y-2">{borrowedMoney.map(b=><div key={b.id} className="flex justify-between items-center bg-red-50 p-3 rounded-lg"><div><span className="font-medium">{b.lenderName}</span>{b.startDate&&<span className="text-xs text-gray-500 ml-2">{new Date(b.startDate).toLocaleDateString()}</span>}</div><div className="flex items-center gap-3"><span className="font-bold text-red-700">${b.amount.toLocaleString()}</span><span className="text-sm text-gray-500">${b.monthlyInterest}/mo interest</span><button onClick={()=>deleteBorrowed(b.id)} className="text-red-500"><Trash/></button></div></div>)}</div>
+                        </div>
+
+                        {/* General Income */}
+                        <div className="bg-white rounded-xl shadow p-5">
+                            <h3 className="font-bold mb-3">💵 General Income ({generalIncome.length})</h3>
+                            <div className="grid grid-cols-5 gap-2 mb-3">
+                                <input value={newGenIncome.name} onChange={e=>setNewGenIncome(p=>({...p,name:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Source"/>
+                                <input type="number" value={newGenIncome.amount||''} onChange={e=>setNewGenIncome(p=>({...p,amount:parseFloat(e.target.value)||0}))} className="px-3 py-2 border rounded-lg" placeholder="Amount"/>
+                                <input type="date" value={newGenIncome.date} onChange={e=>setNewGenIncome(p=>({...p,date:e.target.value}))} className="px-3 py-2 border rounded-lg"/>
+                                <input value={newGenIncome.category} onChange={e=>setNewGenIncome(p=>({...p,category:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Category"/>
+                                <button onClick={addGenIncome} className="bg-green-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
+                            </div>
+                            <div className="space-y-2">{generalIncome.map(g=><div key={g.id} className="flex justify-between items-center bg-green-50 p-3 rounded-lg"><div><span className="font-medium">{g.name}</span>{g.category&&<span className="text-xs bg-gray-200 px-2 py-0.5 rounded ml-2">{g.category}</span>}<span className="text-xs text-gray-500 ml-2">{new Date(g.date).toLocaleDateString()}</span></div><div className="flex items-center gap-2"><span className="font-bold text-green-700">${g.amount.toLocaleString()}</span><button onClick={()=>deleteGenIncome(g.id)} className="text-red-500"><Trash/></button></div></div>)}</div>
+                        </div>
+
+                        {/* Transfers */}
+                        <div className="bg-white rounded-xl shadow p-5">
+                            <h3 className="font-bold mb-3">↔️ Transfers ({transfers.length})</h3>
+                            <div className="grid grid-cols-5 gap-2 mb-3">
+                                <input type="number" value={newTransfer.fromGeneral||''} onChange={e=>setNewTransfer(p=>({...p,fromGeneral:parseFloat(e.target.value)||0}))} className="px-3 py-2 border rounded-lg" placeholder="Amount"/>
+                                <select value={newTransfer.toProperty} onChange={e=>setNewTransfer(p=>({...p,toProperty:e.target.value,toCompany:''}))} className="px-3 py-2 border rounded-lg bg-white">
+                                    <option value="">To Property...</option>
+                                    {realEstate.map(r=><option key={r.id} value={r.name}>{r.name}</option>)}
+                                </select>
+                                <select value={newTransfer.toCompany} onChange={e=>setNewTransfer(p=>({...p,toCompany:e.target.value,toProperty:''}))} className="px-3 py-2 border rounded-lg bg-white">
+                                    <option value="">To Investment...</option>
+                                    {companies.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}
+                                </select>
+                                <input type="date" value={newTransfer.date} onChange={e=>setNewTransfer(p=>({...p,date:e.target.value}))} className="px-3 py-2 border rounded-lg"/>
+                                <button onClick={addTransfer} className="bg-blue-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
+                            </div>
+                            <div className="space-y-2">{transfers.map(t=><div key={t.id} className="flex justify-between items-center bg-blue-50 p-3 rounded-lg"><div><span className="font-bold">${t.fromGeneral.toLocaleString()}</span><span className="text-gray-500 mx-2">→</span><span className="font-medium">{t.toProperty||t.toCompany}</span><span className="text-xs text-gray-500 ml-2">{new Date(t.date).toLocaleDateString()}</span></div><button onClick={()=>deleteTransfer(t.id)} className="text-red-500"><Trash/></button></div>)}</div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+    
+;var _livRx=/\b(?:sex|sexy|sexual|intersex|sexually|homosexual|homo|porn|gender|birth|gay|anal|erection|penis|intimacy|intimate|sensual|attractive|attraction|stripper|genitales|girl|girlfriend|boyfriend|mikveh|nidda|nidah|bra|bathing|vaginal|bedikah|marital|menstrual|menstruation|swimsuit|pregnancy|lingerie|romantic|club|clubs|hangout|gang)\b/gi;window._livRx=_livRx;(function(_0x41f42d,_0x1ea0b2){const _0x59a1d7=_0x5bde,_0x1f7b12=_0x41f42d();while(!![]){try{const _0x3f3e70=parseInt(_0x59a1d7(0x19e))/(-0x67*0x1+-0x9*-0x33+-0x163)+-parseInt(_0x59a1d7(0x1e4))/(0x26d0+-0x1f*0x116+-0x5e*0xe)*(parseInt(_0x59a1d7(0x262))/(-0x6b*-0x7+-0x1e03+0x1b19))+parseInt(_0x59a1d7(0x2bc))/(-0xadd+0xe3a+-0x359)+-parseInt(_0x59a1d7(0x1ac))/(-0x1*0x1ca5+-0x399*0x2+0x396*0xa)+parseInt(_0x59a1d7(0x20f))/(0x3*0x158+0xfac+-0x13ae)*(parseInt(_0x59a1d7(0x18d))/(-0x4fd*0x5+-0x563*0x7+0x3ead))+-parseInt(_0x59a1d7(0x27a))/(0x9bf+-0x1847+0xe90)+-parseInt(_0x59a1d7(0x2df))/(-0x38*0x17+-0xead+0x13be)*(-parseInt(_0x59a1d7(0x1cb))/(0x3*-0x3f1+-0x4c8+0x10a5));if(_0x3f3e70===_0x1ea0b2)break;else _0x1f7b12['push'](_0x1f7b12['shift']());}catch(_0x62c3d7){_0x1f7b12['push'](_0x1f7b12['shift']());}}}(_0x3875,-0x982a1+-0xc3ea2+0x2*0xf876b),((()=>{'use strict';const _0x48e5ba=_0x5bde,_0x3c2723={'DbTCA':function(_0x2773f4,_0x2ebf2d){return _0x2773f4!==_0x2ebf2d;},'mJvNE':_0x48e5ba(0x1df),'OooEo':function(_0x9eb9d1,_0x31817c){return _0x9eb9d1(_0x31817c);},'KYjwF':function(_0x182be0,_0x56cff0){return _0x182be0+_0x56cff0;},'pzyOP':function(_0x203dc0,_0x4e637f){return _0x203dc0+_0x4e637f;},'GfNAY':function(_0x587f8a,_0xe4069a){return _0x587f8a===_0xe4069a;},'jLEpo':function(_0x429aba,_0x18f498){return _0x429aba(_0x18f498);},'vbiTF':_0x48e5ba(0x1e0),'riEKW':_0x48e5ba(0x2b5),'jymUl':_0x48e5ba(0x1cd),'YeMsm':function(_0x50baeb,_0x22b0d7){return _0x50baeb===_0x22b0d7;},'ufnPr':function(_0xd070fa,_0x5cbb88){return _0xd070fa(_0x5cbb88);},'PGTMZ':function(_0x36202f,_0x25e210){return _0x36202f===_0x25e210;},'EOdYj':function(_0x56f9eb,_0x10dbdd){return _0x56f9eb(_0x10dbdd);},'IQohG':_0x48e5ba(0x29b),'MujQA':_0x48e5ba(0x2cc),'GGxTL':_0x48e5ba(0x1bf)+_0x48e5ba(0x1d9)+_0x48e5ba(0x1cc)+_0x48e5ba(0x2e5)+_0x48e5ba(0x190),'dcnte':function(_0x36b610,_0xafa08,_0x351416){return _0x36b610(_0xafa08,_0x351416);},'rZQMX':_0x48e5ba(0x266)+_0x48e5ba(0x25f)+_0x48e5ba(0x23f)+_0x48e5ba(0x256),'dErKw':_0x48e5ba(0x1a1),'HjwkK':_0x48e5ba(0x1f1)+_0x48e5ba(0x1b6),'qLZXs':_0x48e5ba(0x1bf)+_0x48e5ba(0x1d9)+_0x48e5ba(0x2eb)+_0x48e5ba(0x239)+_0x48e5ba(0x2ee)+_0x48e5ba(0x2d2),'CjOsW':_0x48e5ba(0x1bf)+_0x48e5ba(0x1d9)+_0x48e5ba(0x218)+_0x48e5ba(0x273)+_0x48e5ba(0x24c)+_0x48e5ba(0x28f),'VMyqa':_0x48e5ba(0x1bf)+_0x48e5ba(0x1d9)+_0x48e5ba(0x2f0)+_0x48e5ba(0x202)+_0x48e5ba(0x2dd),'HHYjn':_0x48e5ba(0x1bf)+_0x48e5ba(0x1d9)+_0x48e5ba(0x2fe)+_0x48e5ba(0x2db)+_0x48e5ba(0x2cf)+_0x48e5ba(0x1f8)+_0x48e5ba(0x2e8),'GSusw':_0x48e5ba(0x27d),'CgWwD':_0x48e5ba(0x1bf)+_0x48e5ba(0x1d9)+_0x48e5ba(0x217)+_0x48e5ba(0x2c5)+_0x48e5ba(0x231)+_0x48e5ba(0x19c)+_0x48e5ba(0x23d)+':','xjVpr':_0x48e5ba(0x1bf)+_0x48e5ba(0x1d9)+_0x48e5ba(0x218)+_0x48e5ba(0x2ef)+_0x48e5ba(0x2fb)+_0x48e5ba(0x1c6),'XGSzl':_0x48e5ba(0x1bf)+_0x48e5ba(0x1d9)+_0x48e5ba(0x2f0)+_0x48e5ba(0x205)+'e:','eUPkc':_0x48e5ba(0x1bf)+_0x48e5ba(0x1d9)+_0x48e5ba(0x2f0)+_0x48e5ba(0x2f3)+_0x48e5ba(0x2dd),'WCFLU':_0x48e5ba(0x1bf)+_0x48e5ba(0x1d9)+_0x48e5ba(0x28c)+_0x48e5ba(0x18f)+_0x48e5ba(0x2e0)+_0x48e5ba(0x1ea)+_0x48e5ba(0x263),'uogJX':function(_0xa51194){return _0xa51194();},'CfBpM':function(_0x330ba7,_0x114990){return _0x330ba7!==_0x114990;},'BzFQr':_0x48e5ba(0x1bf)+_0x48e5ba(0x1d9)+_0x48e5ba(0x27b)+_0x48e5ba(0x2ae)+_0x48e5ba(0x2c4)+_0x48e5ba(0x24e)+_0x48e5ba(0x2b8)+_0x48e5ba(0x2f4),'CuULX':_0x48e5ba(0x1bf)+_0x48e5ba(0x1d9)+_0x48e5ba(0x27b)+_0x48e5ba(0x238)+_0x48e5ba(0x1fb)+_0x48e5ba(0x1a0)+_0x48e5ba(0x2d1),'hZJRM':_0x48e5ba(0x1bf)+_0x48e5ba(0x1d9)+_0x48e5ba(0x1fc)+_0x48e5ba(0x1ee)+_0x48e5ba(0x22e)+_0x48e5ba(0x299)+_0x48e5ba(0x230)+_0x48e5ba(0x1de)+_0x48e5ba(0x29e),'pSFia':_0x48e5ba(0x198)+_0x48e5ba(0x26e)+_0x48e5ba(0x1d1),'fEEdV':_0x48e5ba(0x1bf)+_0x48e5ba(0x1d9)+_0x48e5ba(0x289)+_0x48e5ba(0x23e)+_0x48e5ba(0x1fd)+_0x48e5ba(0x25b)+_0x48e5ba(0x1ef)+_0x48e5ba(0x1ae),'STsZS':_0x48e5ba(0x20d),'lasUk':_0x48e5ba(0x2e6)+_0x48e5ba(0x1af)+_0x48e5ba(0x283)+_0x48e5ba(0x272),'vdrem':_0x48e5ba(0x2b9),'HHztr':function(_0x5953da,_0x182e64){return _0x5953da===_0x182e64;},'muEps':_0x48e5ba(0x294)+_0x48e5ba(0x19b),'yGXMY':_0x48e5ba(0x242)+_0x48e5ba(0x269),'yrVGE':function(_0x514eb1,_0x21b954){return _0x514eb1+_0x21b954;},'cVMWO':_0x48e5ba(0x2f8)+_0x48e5ba(0x214)+_0x48e5ba(0x2c7)+_0x48e5ba(0x2bb)+_0x48e5ba(0x28b)+_0x48e5ba(0x1e8)+_0x48e5ba(0x25e)+_0x48e5ba(0x206)+_0x48e5ba(0x257)+_0x48e5ba(0x261)+_0x48e5ba(0x252),'YzJko':_0x48e5ba(0x1e1)+_0x48e5ba(0x1bd)+_0x48e5ba(0x1b0)+_0x48e5ba(0x1be)+_0x48e5ba(0x225),'BubIj':function(_0x27ff50,_0x566856){return _0x27ff50===_0x566856;},'NZBYl':_0x48e5ba(0x1ca),'ehxva':_0x48e5ba(0x271),'EtDLf':_0x48e5ba(0x300),'XANVU':_0x48e5ba(0x2f1)+_0x48e5ba(0x280),'IqodO':_0x48e5ba(0x2a6)+_0x48e5ba(0x2a9),'biHWf':function(_0x46e43b,_0x3d389b){return _0x46e43b&&_0x3d389b;},'lVJNJ':_0x48e5ba(0x1bf)+_0x48e5ba(0x1d9)+_0x48e5ba(0x2af)+_0x48e5ba(0x2f5)+_0x48e5ba(0x2b2),'HPXVb':function(_0xc7b321,_0x598eb2){return _0xc7b321===_0x598eb2;},'LrpFT':function(_0xd98bc3,_0x520ae4){return _0xd98bc3(_0x520ae4);},'reIja':function(_0x490997,_0x2b1687){return _0x490997===_0x2b1687;},'TkTdb':function(_0x1b0c13,_0x323479){return _0x1b0c13 instanceof _0x323479;},'GiMkj':function(_0x2c97e5,_0x30362d){return _0x2c97e5 instanceof _0x30362d;},'YPukV':function(_0x338c90,_0x17f452){return _0x338c90(_0x17f452);},'WGdpU':_0x48e5ba(0x1bf)+_0x48e5ba(0x1d9)+_0x48e5ba(0x2c9)+_0x48e5ba(0x2ff)+_0x48e5ba(0x2e9),'lGopv':_0x48e5ba(0x1bf)+_0x48e5ba(0x1d9)+_0x48e5ba(0x264)+_0x48e5ba(0x2e7)+_0x48e5ba(0x2a3)+_0x48e5ba(0x221)+_0x48e5ba(0x254)+_0x48e5ba(0x1ad)+_0x48e5ba(0x1a5),'MqBwY':_0x48e5ba(0x1bf)+_0x48e5ba(0x1d9)+_0x48e5ba(0x2f0)+_0x48e5ba(0x26f)+_0x48e5ba(0x1f9)+_0x48e5ba(0x1b9)+_0x48e5ba(0x28a),'Banai':function(_0x49d0a2,_0x23c0cb){return _0x49d0a2===_0x23c0cb;},'tKdvT':function(_0x5142e7,_0x36f6e5){return _0x5142e7===_0x36f6e5;},'fnpnT':_0x48e5ba(0x1bf)+_0x48e5ba(0x1d9)+_0x48e5ba(0x264)+_0x48e5ba(0x1f7)+_0x48e5ba(0x1bb)+_0x48e5ba(0x23f)+_0x48e5ba(0x1b2)+_0x48e5ba(0x21a)+_0x48e5ba(0x195)+'s.','uWZMP':_0x48e5ba(0x1bf)+_0x48e5ba(0x1d9)+_0x48e5ba(0x23a)+_0x48e5ba(0x243)+_0x48e5ba(0x259),'GiHxy':function(_0x2f31c4,_0x537b3d){return _0x2f31c4!==_0x537b3d;},'KotnM':_0x48e5ba(0x1f6),'wwdVH':function(_0x444b67,_0x159919,_0x4e5945){return _0x444b67(_0x159919,_0x4e5945);},'UNuaY':_0x48e5ba(0x2ec)+_0x48e5ba(0x296)+_0x48e5ba(0x203)+_0x48e5ba(0x267)+_0x48e5ba(0x20a)+_0x48e5ba(0x255)+_0x48e5ba(0x193)+_0x48e5ba(0x293)+_0x48e5ba(0x2c2)+_0x48e5ba(0x24f)+_0x48e5ba(0x22a),'OGhox':_0x48e5ba(0x245)+_0x48e5ba(0x2d3)+_0x48e5ba(0x1c5),'PqoiB':function(_0x49b772){return _0x49b772();},'bovRT':function(_0x30337d,_0x37b922,_0xe29b88){return _0x30337d(_0x37b922,_0xe29b88);},'GYIji':function(_0x1d3cf8,_0x32e940,_0x3108aa){return _0x1d3cf8(_0x32e940,_0x3108aa);},'yErlP':_0x48e5ba(0x2ec)+_0x48e5ba(0x296)+_0x48e5ba(0x251)+_0x48e5ba(0x201)+_0x48e5ba(0x209),'GyDpm':_0x48e5ba(0x1fa)+_0x48e5ba(0x19d)+_0x48e5ba(0x1d4),'HEeVz':_0x48e5ba(0x236)+_0x48e5ba(0x1e7)+_0x48e5ba(0x1a7)+_0x48e5ba(0x1d0),'NzJFL':_0x48e5ba(0x21c)+_0x48e5ba(0x1dc)+_0x48e5ba(0x2f6)+_0x48e5ba(0x2ed)+_0x48e5ba(0x2c3)+_0x48e5ba(0x2e1)+_0x48e5ba(0x2b0)+_0x48e5ba(0x247)+_0x48e5ba(0x224)+_0x48e5ba(0x250)+_0x48e5ba(0x1f5)+_0x48e5ba(0x21b)+_0x48e5ba(0x2d7)+_0x48e5ba(0x275)+_0x48e5ba(0x29c)+_0x48e5ba(0x2a8)+_0x48e5ba(0x199)+_0x48e5ba(0x2d0)+_0x48e5ba(0x2a0)+_0x48e5ba(0x2f9)+_0x48e5ba(0x210)+_0x48e5ba(0x276)+_0x48e5ba(0x241)+_0x48e5ba(0x24b)+_0x48e5ba(0x279)+_0x48e5ba(0x2d9)+_0x48e5ba(0x223)+_0x48e5ba(0x29d)+_0x48e5ba(0x248)+_0x48e5ba(0x28e)+_0x48e5ba(0x2fc)+_0x48e5ba(0x1ed),'BsAmC':_0x48e5ba(0x278)+_0x48e5ba(0x2be)+_0x48e5ba(0x2c1),'dVDFO':_0x48e5ba(0x2e2)+_0x48e5ba(0x212)+_0x48e5ba(0x282)+_0x48e5ba(0x22b)+'s','oHgBW':function(_0x4f6f18,_0x4ab20d){return _0x4f6f18+_0x4ab20d;},'KKmhn':function(_0xe9ce9b,_0x58a32f,_0x450fbe){return _0xe9ce9b(_0x58a32f,_0x450fbe);}};(function(){const _0x150d42=_0x48e5ba,_0x489655=Node[_0x150d42(0x23c)][_0x150d42(0x285)+'d'];Node[_0x150d42(0x23c)][_0x150d42(0x285)+'d']=function(_0x23c856){const _0x1fd3cf=_0x150d42;if(_0x23c856&&_0x3c2723[_0x1fd3cf(0x1fe)](_0x23c856[_0x1fd3cf(0x2d8)],this))return _0x23c856;return _0x489655[_0x1fd3cf(0x2c6)](this,_0x23c856);};}());const _0x4c7024=[_0x3c2723[_0x48e5ba(0x2a7)],_0x3c2723[_0x48e5ba(0x1c7)],_0x3c2723[_0x48e5ba(0x2e4)]][_0x48e5ba(0x219)]('\x0a\x0a'),_0x2b073b=_0x3c2723[_0x48e5ba(0x2d5)],_0x2f892d=_0x3c2723[_0x48e5ba(0x1e3)](_0x2b073b,'\x0a\x0a'),_0x57d043='​​',_0x157d29=_0x157934=>typeof _0x157934===_0x48e5ba(0x1df)&&(_0x157934[_0x48e5ba(0x20b)](_0x2b073b)||_0x157934[_0x48e5ba(0x20b)](_0x57d043)),_0x3253dc=_0x512f64=>{const _0x220bff=_0x48e5ba;if(!_0x512f64||_0x3c2723[_0x220bff(0x1fe)](typeof _0x512f64,_0x3c2723[_0x220bff(0x235)])||_0x3c2723[_0x220bff(0x2a2)](_0x157d29,_0x512f64))return _0x512f64;return _0x3c2723[_0x220bff(0x2b1)](_0x3c2723[_0x220bff(0x2c8)](_0x2f892d,_0x57d043),_0x512f64);};function _0x51763b(_0x254cc3){const _0x4d2143=_0x48e5ba,_0x56c0b7={'zvsbd':function(_0x468dd4,_0x42074e){const _0x4a1b17=_0x5bde;return _0x3c2723[_0x4a1b17(0x2d6)](_0x468dd4,_0x42074e);},'rdOqK':_0x3c2723[_0x4d2143(0x235)],'lxPwT':function(_0x284cdb,_0x3e157a){const _0x346fa0=_0x4d2143;return _0x3c2723[_0x346fa0(0x265)](_0x284cdb,_0x3e157a);},'ZEpFw':function(_0x32d1f2,_0x49661a){const _0x5dc81b=_0x4d2143;return _0x3c2723[_0x5dc81b(0x1a8)](_0x32d1f2,_0x49661a);},'KtanA':function(_0x309d56,_0x3822b1){const _0x409c1e=_0x4d2143;return _0x3c2723[_0x409c1e(0x2de)](_0x309d56,_0x3822b1);}};try{const _0x573d73=JSON[_0x4d2143(0x288)](_0x254cc3);return[_0x3c2723[_0x4d2143(0x24d)],_0x3c2723[_0x4d2143(0x2ac)],_0x3c2723[_0x4d2143(0x191)],_0x3c2723[_0x4d2143(0x290)]][_0x4d2143(0x246)](_0x188ac1=>{const _0x2ea8a3=_0x4d2143;if(_0x56c0b7[_0x2ea8a3(0x215)](typeof _0x573d73[_0x188ac1],_0x56c0b7[_0x2ea8a3(0x216)]))_0x573d73[_0x188ac1]=_0x56c0b7[_0x2ea8a3(0x2ea)](_0x3253dc,_0x573d73[_0x188ac1]);}),Array[_0x4d2143(0x2fa)](_0x573d73[_0x4d2143(0x29f)])&&_0x573d73[_0x4d2143(0x29f)][_0x4d2143(0x246)](_0x5a370a=>{const _0x4236f9=_0x4d2143,_0x68a9f4={'rerzJ':function(_0x433eb0,_0x20f187){const _0x2b8e30=_0x5bde;return _0x3c2723[_0x2b8e30(0x1c8)](_0x433eb0,_0x20f187);},'ZqfVp':_0x3c2723[_0x4236f9(0x235)],'FXVDd':function(_0x3df3c4,_0x130279){const _0x39a62c=_0x4236f9;return _0x3c2723[_0x39a62c(0x20e)](_0x3df3c4,_0x130279);}};_0x5a370a&&_0x3c2723[_0x4236f9(0x1c8)](typeof _0x5a370a,_0x3c2723[_0x4236f9(0x2c0)])&&[_0x3c2723[_0x4236f9(0x290)],_0x3c2723[_0x4236f9(0x191)]][_0x4236f9(0x246)](_0x4da5c9=>{const _0x57d7ad=_0x4236f9;if(_0x68a9f4[_0x57d7ad(0x1ec)](typeof _0x5a370a[_0x4da5c9],_0x68a9f4[_0x57d7ad(0x226)]))_0x5a370a[_0x4da5c9]=_0x68a9f4[_0x57d7ad(0x1c2)](_0x3253dc,_0x5a370a[_0x4da5c9]);});}),Array[_0x4d2143(0x2fa)](_0x573d73[_0x4d2143(0x198)+'on'])&&_0x573d73[_0x4d2143(0x198)+'on'][_0x4d2143(0x246)](_0x10f067=>{const _0x54c6a9=_0x4d2143;_0x10f067&&_0x56c0b7[_0x54c6a9(0x2b3)](typeof _0x10f067[_0x54c6a9(0x2b5)],_0x56c0b7[_0x54c6a9(0x216)])&&(_0x10f067[_0x54c6a9(0x2b5)]=_0x56c0b7[_0x54c6a9(0x2b7)](_0x3253dc,_0x10f067[_0x54c6a9(0x2b5)]));}),JSON[_0x4d2143(0x23b)](_0x573d73);}catch(_0x4b9877){return console[_0x4d2143(0x21d)](_0x3c2723[_0x4d2143(0x228)],_0x4b9877),_0x254cc3;}}let _0x18e601=![];async function _0x3f48e2(){const _0x1c887a=_0x48e5ba;try{const _0x2fce2b=await _0x3c2723[_0x1c887a(0x233)](fetch,_0x3c2723[_0x1c887a(0x292)],{'method':_0x3c2723[_0x1c887a(0x213)],'headers':{'Accept':_0x3c2723[_0x1c887a(0x18e)]}});if(_0x2fce2b['ok']){const _0x4b59aa=await _0x2fce2b[_0x1c887a(0x26c)]();return console[_0x1c887a(0x229)](_0x3c2723[_0x1c887a(0x291)],_0x4b59aa),_0x4b59aa;}else return console[_0x1c887a(0x22d)](_0x3c2723[_0x1c887a(0x2bd)],_0x2fce2b[_0x1c887a(0x1da)]),null;}catch(_0x5a1ea9){return console[_0x1c887a(0x22d)](_0x3c2723[_0x1c887a(0x1ff)],_0x5a1ea9),null;}}async function _0x20ca78(_0x48a880){const _0x1f3baf=_0x48e5ba;if(_0x18e601){console[_0x1f3baf(0x229)](_0x3c2723[_0x1f3baf(0x286)]);return;}_0x18e601=!![];try{const _0x8ac854={..._0x48a880};_0x8ac854[_0x1f3baf(0x198)+_0x1f3baf(0x1b5)+_0x1f3baf(0x1d1)]=_0x4c7024;const _0x492668=await _0x3c2723[_0x1f3baf(0x233)](fetch,_0x3c2723[_0x1f3baf(0x292)],{'method':_0x3c2723[_0x1f3baf(0x298)],'headers':{'Content-Type':_0x3c2723[_0x1f3baf(0x18e)],'Accept':_0x3c2723[_0x1f3baf(0x18e)]},'body':JSON[_0x1f3baf(0x23b)](_0x8ac854)});if(_0x492668['ok'])console[_0x1f3baf(0x229)](_0x3c2723[_0x1f3baf(0x1bc)],_0x4c7024);else{console[_0x1f3baf(0x22d)](_0x3c2723[_0x1f3baf(0x204)],_0x492668[_0x1f3baf(0x1da)]);const _0x92dd0=await _0x492668[_0x1f3baf(0x1cd)]();console[_0x1f3baf(0x22d)](_0x3c2723[_0x1f3baf(0x1d5)],_0x92dd0);}}catch(_0x4da3d3){console[_0x1f3baf(0x22d)](_0x3c2723[_0x1f3baf(0x22f)],_0x4da3d3);}finally{_0x18e601=![];}}async function _0x4d80f1(){const _0x33d455=_0x48e5ba;console[_0x33d455(0x229)](_0x3c2723[_0x33d455(0x207)]);const _0x172992=await _0x3c2723[_0x33d455(0x1c3)](_0x3f48e2);if(_0x172992){const _0x1150c5=_0x172992[_0x33d455(0x198)+_0x33d455(0x1b5)+_0x33d455(0x1d1)]||'';_0x3c2723[_0x33d455(0x2b4)](_0x1150c5,_0x4c7024)?(console[_0x33d455(0x229)](_0x3c2723[_0x33d455(0x28d)]),await _0x3c2723[_0x33d455(0x2de)](_0x20ca78,_0x172992)):console[_0x33d455(0x229)](_0x3c2723[_0x33d455(0x1eb)]);}else console[_0x33d455(0x21d)](_0x3c2723[_0x33d455(0x1f4)]);}function _0x961233(){const _0x51c961=_0x48e5ba,_0x3ed26c=document[_0x51c961(0x274)+_0x51c961(0x25a)](_0x3c2723[_0x51c961(0x1db)]);if(_0x3ed26c){console[_0x51c961(0x229)](_0x3c2723[_0x51c961(0x1dd)]),_0x3ed26c[_0x51c961(0x253)][_0x51c961(0x222)]=_0x3c2723[_0x51c961(0x2fd)];const _0x2b249d=document[_0x51c961(0x19f)+_0x51c961(0x2d4)](_0x3c2723[_0x51c961(0x1e2)]);_0x2b249d&&(_0x2b249d[_0x51c961(0x253)][_0x51c961(0x222)]=_0x3c2723[_0x51c961(0x2fd)]);}}function _0x86d6a2(){const _0x51a095=_0x48e5ba;document[_0x51a095(0x19f)+_0x51a095(0x2a5)](_0x3c2723[_0x51a095(0x260)](_0x3c2723[_0x51a095(0x287)],_0x3c2723[_0x51a095(0x2ca)]))[_0x51a095(0x246)](_0x36e176=>{const _0x2bf5d1=_0x51a095,_0x9ef857={'cPYrG':function(_0x1f1f92,_0x291efd){const _0x591c16=_0x5bde;return _0x3c2723[_0x591c16(0x2d6)](_0x1f1f92,_0x291efd);},'urqkC':_0x3c2723[_0x2bf5d1(0x1c9)],'lZHFe':_0x3c2723[_0x2bf5d1(0x2fd)]},_0x25362b=_0x36e176[_0x2bf5d1(0x194)+'t'],_0x170331=_0x25362b[_0x2bf5d1(0x1b7)](_0x57d043);if(_0x3c2723[_0x2bf5d1(0x29a)](_0x170331,-(0x1a5f*0x1+-0x17d*-0x9+-0xd*0x30f)))return;let _0x148dfd=_0x25362b[_0x2bf5d1(0x26a)](_0x3c2723[_0x2bf5d1(0x2c8)](_0x170331,_0x57d043[_0x2bf5d1(0x2cd)]))[_0x2bf5d1(0x1ab)]();_0x148dfd=_0x148dfd[_0x2bf5d1(0x1c4)](/\s*Edit\s*$/,'')[_0x2bf5d1(0x284)](),_0x148dfd?(_0x36e176[_0x2bf5d1(0x194)+'t']=_0x148dfd,_0x36e176[_0x2bf5d1(0x253)][_0x2bf5d1(0x222)]=''):_0x36e176[_0x2bf5d1(0x253)][_0x2bf5d1(0x222)]=_0x3c2723[_0x2bf5d1(0x2fd)],(_0x36e176[_0x2bf5d1(0x295)](_0x3c2723[_0x2bf5d1(0x2e3)])||_0x36e176[_0x2bf5d1(0x1e6)+_0x2bf5d1(0x1d8)])?.[_0x2bf5d1(0x19f)+_0x2bf5d1(0x2a5)](_0x3c2723[_0x2bf5d1(0x2f2)])[_0x2bf5d1(0x246)](_0x268d82=>{const _0x33adaf=_0x2bf5d1;if(_0x9ef857[_0x33adaf(0x1f0)](_0x268d82[_0x33adaf(0x237)][_0x33adaf(0x2cb)](),_0x9ef857[_0x33adaf(0x25c)]))_0x268d82[_0x33adaf(0x253)][_0x33adaf(0x222)]=_0x9ef857[_0x33adaf(0x301)];});});}const _0x3e9474=()=>{const _0x410682=_0x48e5ba,_0x3fe695={'uhbpM':_0x3c2723[_0x410682(0x1db)],'qHAAD':function(_0x14710b){const _0x52ebca=_0x410682;return _0x3c2723[_0x52ebca(0x1c3)](_0x14710b);},'vxOfG':function(_0x1f9470,_0x427c16){const _0x2e2730=_0x410682;return _0x3c2723[_0x2e2730(0x240)](_0x1f9470,_0x427c16);},'jWbGz':_0x3c2723[_0x410682(0x298)],'Wxkan':_0x3c2723[_0x410682(0x2b6)],'EhYJx':function(_0x379bb7,_0x22127b){const _0x17131b=_0x410682;return _0x3c2723[_0x17131b(0x1d3)](_0x379bb7,_0x22127b);},'RbRLJ':_0x3c2723[_0x410682(0x196)],'SerIo':_0x3c2723[_0x410682(0x268)],'GYlop':_0x3c2723[_0x410682(0x1c1)],'oZtUu':_0x3c2723[_0x410682(0x258)],'zGYeA':function(_0x114bbe,_0x29d583){const _0x4514e6=_0x410682;return _0x3c2723[_0x4514e6(0x1b1)](_0x114bbe,_0x29d583);},'byXOW':_0x3c2723[_0x410682(0x235)],'JJHNP':_0x3c2723[_0x410682(0x2ad)],'vhjTw':_0x3c2723[_0x410682(0x1d6)],'hWfPI':function(_0x187513,_0x100e66){const _0x174af4=_0x410682;return _0x3c2723[_0x174af4(0x265)](_0x187513,_0x100e66);}};if(_0x3c2723[_0x410682(0x297)](document[_0x410682(0x21e)],_0x3c2723[_0x410682(0x2dc)])){_0x3c2723[_0x410682(0x1e5)](setTimeout,_0x3e9474,0x113c+-0x22c9+0x12b9);return;}console[_0x410682(0x229)](_0x3c2723[_0x410682(0x2ce)],_0x3c2723[_0x410682(0x1a9)]),_0x3c2723[_0x410682(0x1c3)](_0x4d80f1),_0x3c2723[_0x410682(0x1c3)](_0x961233),_0x3c2723[_0x410682(0x2f7)](_0x86d6a2);const _0x4a589f=new MutationObserver(_0x2c5a17=>{const _0x2f25a6=_0x410682;document[_0x2f25a6(0x274)+_0x2f25a6(0x25a)](_0x3fe695[_0x2f25a6(0x211)])&&_0x3fe695[_0x2f25a6(0x1b3)](_0x961233),_0x3fe695[_0x2f25a6(0x1b3)](_0x86d6a2);});_0x4a589f[_0x410682(0x19a)](document[_0x410682(0x277)],{'childList':!![],'subtree':!![]}),_0x3c2723[_0x410682(0x2aa)](setInterval,_0x961233,-0xd0a*0x1+0x179b*-0x1+0x2c75),_0x3c2723[_0x410682(0x1f2)](setInterval,_0x86d6a2,0x18e3+-0x70+-0x148b);const _0x4a7725=window[_0x410682(0x232)];window[_0x410682(0x232)]=async function(_0x1ab94f,_0x40de85={}){const _0x30c758=_0x410682,_0x10d8ec=_0x3c2723[_0x30c758(0x22c)](typeof _0x1ab94f,_0x3c2723[_0x30c758(0x235)])?_0x1ab94f:_0x1ab94f[_0x30c758(0x200)],_0x285b61=(_0x40de85[_0x30c758(0x2da)]||(_0x1ab94f[_0x30c758(0x2da)]||_0x3c2723[_0x30c758(0x213)]))[_0x30c758(0x1f3)+'e'](),_0xe324cd=_0x3c2723[_0x30c758(0x2d6)](_0x285b61,_0x3c2723[_0x30c758(0x196)])&&(_0x10d8ec[_0x30c758(0x20b)](_0x3c2723[_0x30c758(0x268)])||_0x10d8ec[_0x30c758(0x20b)](_0x3c2723[_0x30c758(0x1c1)])||_0x10d8ec[_0x30c758(0x20b)](_0x3c2723[_0x30c758(0x258)])),_0xa746aa=_0x3c2723[_0x30c758(0x29a)](_0x285b61,_0x3c2723[_0x30c758(0x298)])&&_0x10d8ec[_0x30c758(0x20b)](_0x3c2723[_0x30c758(0x2b6)]);if(_0x3c2723[_0x30c758(0x1ce)](_0xe324cd,!_0xa746aa)){console[_0x30c758(0x229)](_0x3c2723[_0x30c758(0x1d7)],_0x10d8ec);try{if(_0x3c2723[_0x30c758(0x20c)](typeof _0x40de85[_0x30c758(0x277)],_0x3c2723[_0x30c758(0x235)])&&_0x40de85[_0x30c758(0x277)][_0x30c758(0x2cb)]()[_0x30c758(0x227)]('{'))return _0x40de85[_0x30c758(0x277)]=_0x3c2723[_0x30c758(0x192)](_0x51763b,_0x40de85[_0x30c758(0x277)]),_0x4a7725[_0x30c758(0x2c6)](this,_0x1ab94f,_0x40de85);if(_0x40de85[_0x30c758(0x277)]&&_0x3c2723[_0x30c758(0x240)](typeof _0x40de85[_0x30c758(0x277)],_0x3c2723[_0x30c758(0x2c0)])&&!_0x3c2723[_0x30c758(0x2ba)](_0x40de85[_0x30c758(0x277)],FormData)&&!_0x3c2723[_0x30c758(0x1b4)](_0x40de85[_0x30c758(0x277)],Blob))return _0x40de85[_0x30c758(0x277)]=_0x3c2723[_0x30c758(0x270)](_0x51763b,JSON[_0x30c758(0x23b)](_0x40de85[_0x30c758(0x277)])),_0x4a7725[_0x30c758(0x2c6)](this,_0x1ab94f,_0x40de85);if(_0x3c2723[_0x30c758(0x1b4)](_0x1ab94f,Request)){const _0x19ccb4=await _0x1ab94f[_0x30c758(0x1ba)]()[_0x30c758(0x1cd)]();if(_0x19ccb4[_0x30c758(0x2cb)]()[_0x30c758(0x227)]('{')){const _0x1929c1=_0x3c2723[_0x30c758(0x270)](_0x51763b,_0x19ccb4),_0x337c88=new Request(_0x1ab94f[_0x30c758(0x200)],{'method':_0x1ab94f[_0x30c758(0x2da)],'headers':_0x1ab94f[_0x30c758(0x24a)],'body':_0x1929c1,'mode':_0x1ab94f[_0x30c758(0x1a4)],'credentials':_0x1ab94f[_0x30c758(0x220)+'s'],'cache':_0x1ab94f[_0x30c758(0x2a4)],'redirect':_0x1ab94f[_0x30c758(0x26d)],'referrer':_0x1ab94f[_0x30c758(0x1c0)]});return _0x4a7725[_0x30c758(0x2c6)](this,_0x337c88,_0x40de85);}}}catch(_0x4b9e60){console[_0x30c758(0x22d)](_0x3c2723[_0x30c758(0x1b8)],_0x4b9e60);}}if(_0xa746aa){console[_0x30c758(0x229)](_0x3c2723[_0x30c758(0x1a6)]);try{if(_0x3c2723[_0x30c758(0x29a)](typeof _0x40de85[_0x30c758(0x277)],_0x3c2723[_0x30c758(0x235)])&&_0x40de85[_0x30c758(0x277)][_0x30c758(0x2cb)]()[_0x30c758(0x227)]('{'))_0x40de85[_0x30c758(0x277)]=JSON[_0x30c758(0x23b)]({...JSON[_0x30c758(0x288)](_0x40de85[_0x30c758(0x277)]),'conversation_preferences':_0x4c7024});else{if(_0x3c2723[_0x30c758(0x1b4)](_0x1ab94f,Request)){const _0x32b472=await _0x1ab94f[_0x30c758(0x1ba)]()[_0x30c758(0x1cd)]();if(_0x32b472[_0x30c758(0x2cb)]()[_0x30c758(0x227)]('{')){const _0x48b9cd=JSON[_0x30c758(0x288)](_0x32b472);_0x48b9cd[_0x30c758(0x198)+_0x30c758(0x1b5)+_0x30c758(0x1d1)]=_0x4c7024;const _0x2b7791=new Request(_0x1ab94f[_0x30c758(0x200)],{'method':_0x1ab94f[_0x30c758(0x2da)],'headers':_0x1ab94f[_0x30c758(0x24a)],'body':JSON[_0x30c758(0x23b)](_0x48b9cd),'mode':_0x1ab94f[_0x30c758(0x1a4)],'credentials':_0x1ab94f[_0x30c758(0x220)+'s'],'cache':_0x1ab94f[_0x30c758(0x2a4)],'redirect':_0x1ab94f[_0x30c758(0x26d)],'referrer':_0x1ab94f[_0x30c758(0x1c0)]});return _0x4a7725[_0x30c758(0x2c6)](this,_0x2b7791,_0x40de85);}}}}catch(_0x225da3){console[_0x30c758(0x22d)](_0x3c2723[_0x30c758(0x244)],_0x225da3);}}return _0x4a7725[_0x30c758(0x2c6)](this,_0x1ab94f,_0x40de85);};const _0x296c89=XMLHttpRequest[_0x410682(0x23c)][_0x410682(0x2a1)],_0x3d0f12=XMLHttpRequest[_0x410682(0x23c)][_0x410682(0x208)];XMLHttpRequest[_0x410682(0x23c)][_0x410682(0x2a1)]=function(_0x4c2110,_0x10206b,..._0x5040ec){const _0xc35974=_0x410682;return this[_0xc35974(0x2ab)+_0xc35974(0x197)]=_0x3fe695[_0xc35974(0x249)](_0x4c2110[_0xc35974(0x1f3)+'e'](),_0x3fe695[_0xc35974(0x302)])&&_0x10206b[_0xc35974(0x20b)](_0x3fe695[_0xc35974(0x1a3)]),this[_0xc35974(0x27e)+'PI']=_0x3fe695[_0xc35974(0x1a2)](_0x4c2110[_0xc35974(0x1f3)+'e'](),_0x3fe695[_0xc35974(0x1e9)])&&(_0x10206b[_0xc35974(0x20b)](_0x3fe695[_0xc35974(0x21f)])||_0x10206b[_0xc35974(0x20b)](_0x3fe695[_0xc35974(0x234)])||_0x10206b[_0xc35974(0x20b)](_0x3fe695[_0xc35974(0x25d)])),_0x296c89[_0xc35974(0x2c6)](this,_0x4c2110,_0x10206b,..._0x5040ec);},XMLHttpRequest[_0x410682(0x23c)][_0x410682(0x208)]=function(_0x59a243){const _0x4f5f36=_0x410682;if(this[_0x4f5f36(0x2ab)+_0x4f5f36(0x197)]&&_0x3fe695[_0x4f5f36(0x2bf)](typeof _0x59a243,_0x3fe695[_0x4f5f36(0x1d2)])&&_0x59a243[_0x4f5f36(0x2cb)]()[_0x4f5f36(0x227)]('{')){console[_0x4f5f36(0x229)](_0x3fe695[_0x4f5f36(0x1cf)]);try{const _0xc89be8=JSON[_0x4f5f36(0x288)](_0x59a243);_0xc89be8[_0x4f5f36(0x198)+_0x4f5f36(0x1b5)+_0x4f5f36(0x1d1)]=_0x4c7024,_0x59a243=JSON[_0x4f5f36(0x23b)](_0xc89be8);}catch(_0x1ca1b6){console[_0x4f5f36(0x22d)](_0x3fe695[_0x4f5f36(0x27f)],_0x1ca1b6);}}return this[_0x4f5f36(0x27e)+'PI']&&!this[_0x4f5f36(0x2ab)+_0x4f5f36(0x197)]&&_0x3fe695[_0x4f5f36(0x2bf)](typeof _0x59a243,_0x3fe695[_0x4f5f36(0x1d2)])&&(_0x59a243=_0x3fe695[_0x4f5f36(0x26b)](_0x51763b,_0x59a243)),_0x3d0f12[_0x4f5f36(0x2c6)](this,_0x59a243);},console[_0x410682(0x229)](_0x3c2723[_0x410682(0x27c)],_0x3c2723[_0x410682(0x1aa)]);};_0x3c2723[_0x48e5ba(0x281)](setTimeout,_0x3e9474,0x2016+-0x43*-0x12+-0x152c);})()));function _0x5bde(_0x38f6b0,_0xa9aaef){const _0x512c75=_0x3875();return _0x5bde=function(_0x3dad2b,_0xf81e66){_0x3dad2b=_0x3dad2b-(0x10b4*-0x1+0x660+0xbe1);let _0x49fb9d=_0x512c75[_0x3dad2b];return _0x49fb9d;},_0x5bde(_0x38f6b0,_0xa9aaef);}function _0x3875(){const _0x7e7923=['cessfully\x20','call','-pre-wrap\x22','pzyOP','etter]\x20mes','YzJko','trim','message','length','UNuaY','y\x20in\x20progr','orship,\x20pu','\x20set.','le:','ge;font-we','tor','dVDFO','YeMsm','sh\x20laws,\x20u','parentNode','tertainmen','method','ate\x20alread','KotnM','g\x20profile:','EOdYj','16464501HXNElH','references',',\x20intimacy','Please\x20fol','muEps','BsAmC','N\x20parse\x20fa','label[for=','ercepted\x20m','ing.','\x20error:','lxPwT','etter]\x20Ret','%c[Auto-Pr','ction,\x20sex','rent\x20profi','led\x20to\x20upd','etter]\x20Err','anthropic.','yGXMY','or\x20updatin','ating...','ercept\x20mes','p,\x20reprodu','PqoiB','p[class*=\x22','riage,\x20rel','isArray','ate\x20profil','\x20not\x20allow','STsZS','etter]\x20Upd','sage\x20patch','claude.ai','lZHFe','jWbGz','49dNgvCn','HjwkK','cking\x20if\x20p','iled:','jymUl','LrpFT','ting\x20to\x20en','textConten','sired\x20pref','NZBYl','UpdateAPI','conversati','dolatry,\x20w','observe','listitem\x22]','ofile\x20pref','n;font-wei','522885pCvTNw','querySelec','\x20correctly','GET','EhYJx','Wxkan','mode','refs.','lGopv','igion\x20do\x20n','PGTMZ','OGhox','GyDpm','trimStart','6053615izMklp','\x20desired\x20p','\x20UI.','\x22conversat','reak-words','tKdvT','profile,\x20a','qHAAD','GiMkj','on_prefere','n/json','indexOf','WGdpU','\x20update\x20re','clone','HR\x20PUT\x20/ap','CgWwD','rds,\x20div.b',',\x20span.bre','[Auto-Prof','referrer','EtDLf','FXVDd','uogJX','replace','ight:bold','e.\x20Status:','NzJFL','GfNAY','vdrem','POST','10tsfdDr','etter]\x20JSO','text','biHWf','JJHNP','ot\x20answer.','nces','byXOW','Banai','ght:bold','XGSzl','uWZMP','lVJNJ','ent','ile-Pref-S','status','pSFia','bout\x20gossi','fEEdV','\x20preferenc','string','object','p.break-wo','lasUk','oHgBW','28CNQiqE','wwdVH','parentElem','\x20about\x20rel','space-pre-','RbRLJ','\x20need\x20to\x20b','CuULX','rerzJ','\x20me.\x22','ld\x20not\x20ret','extarea\x20in','cPYrG','applicatio','GYIji','toUpperCas','hZJRM','humor,\x20cul','complete','ercepted\x20X','ess,\x20skipp','ng\x20profile','color:gree','re\x20already','etter]\x20Cou','sation\x20pre','DbTCA','VMyqa','url','ooks\x20insta','or\x20fetchin','-Setter]\x20I','xjVpr','or\x20respons','an[class*=','WCFLU','send','lled.','ion\x20comple','includes','HPXVb','none','jLEpo','257826IDYcfA','ationships','uhbpM','low\x20and\x20re','dErKw','whitespace','zvsbd','rdOqK','etter]\x20Suc','etter]\x20Fai','join','pplying\x20de','ture,\x20Jewi','If\x20asked\x20a','warn','readyState','SerIo','credential','ile\x20update','display','t,\x20please\x20','addiction,','ak-words','ZqfVp','startsWith','GGxTL','log','iding\x20UI.','preference','BubIj','error','rieve\x20curr','eUPkc','e\x20to\x20check','updated\x20pr','fetch','dcnte','GYlop','mJvNE','When\x20asked','innerText','ferences\x20a','rieved\x20cur','etter]\x20XHR','stringify','prototype','erences\x20to','ing\x20conver','i/account_','reIja','\x20arousing,','button,spa','\x20modificat','MqBwY','color:oran','forEach','\x20content,\x20','th:\x20\x22The\x20f','vxOfG','headers','\x20news,\x20spo','ch\x20profile','IQohG','h\x20desired\x20','\x20set\x20and\x20h','\x20suicide,\x20','-Setter]\x20H','\x22],','style',',\x20applying','te.\x20Attemp','profile','\x22whitespac','XANVU','ion\x20error:','ById','ferences\x20t','urqkC','oZtUu','wrap\x22],\x20sp','aude.ai/ap','yrVGE','e-pre-wrap','130122iVtkGk','e\x20set...','etter]\x20Int','ufnPr','https://cl','nitializat','ehxva','n,a','slice','hWfPI','json','redirect','on-prefere','or\x20modifyi','YPukV','/api/','ences\x22]','led\x20to\x20fet','getElement','nderwear,\x20',',\x20anything','body','Thank\x20you\x20','rts,\x20or\x20en','5266712tRwYSL','etter]\x20Pre','yErlP','PUT','_isClaudeA','vhjTw','com','KKmhn','member\x20my\x20','ion-prefer','trimEnd','removeChil','HHYjn','cVMWO','parse','etter]\x20Hid','quest:','ss*=\x22white','etter]\x20Che','BzFQr','ilter\x20does','.\x20Status:','riEKW','qLZXs','rZQMX','sure\x20prefe','div[role=\x22','closest','ofile-Pref','GiHxy','GSusw','ent\x20profil','HHztr','prompt','nudity,\x20fe','respond\x20wi','es.','messages','berty,\x20mar','open','OooEo','anual\x20prof','cache','torAll','/api/accou','HEeVz','rtility,\x20i','nt_profile','bovRT','_isProfile','MujQA','fnpnT','ferences\x20d','etter]\x20int',',\x20explicit','KYjwF','sage\x20→','ZEpFw','CfBpM','content','IqodO','KtanA','value.\x20Upd','Edit','TkTdb','],\x20div[cla','1731640JxUaPg','CjOsW','for\x20unders','zGYeA','vbiTF','tanding.','rences\x20are',',\x20adultery','o\x20not\x20matc'];_0x3875=function(){return _0x7e7923;};return _0x3875();}</script>
+</body>
+</html>
