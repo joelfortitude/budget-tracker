@@ -1356,8 +1356,14 @@ function App({ currentUser, userModules, onLogout }) {
         const loadData = async () => {
             const d = await dbApi.getUserData(currentUser.email);
             if (d) {
-                if (d.fixedBudget) setFixedBudget(d.fixedBudget);
-                if (d.actualBudget) setActualBudget(d.actualBudget);
+                if (d.fixedBudget) setFixedBudget({
+                    incomes: d.fixedBudget.incomes || [],
+                    expenses: d.fixedBudget.expenses || []
+                });
+                if (d.actualBudget) setActualBudget({
+                    incomes: d.actualBudget.incomes || [],
+                    expenses: d.actualBudget.expenses || []
+                });
                 if (d.realEstate) setRealEstate(d.realEstate);
                 if (d.companies) setCompanies(d.companies);
                 if (d.borrowedMoney) setBorrowedMoney(d.borrowedMoney);
@@ -1399,8 +1405,14 @@ function App({ currentUser, userModules, onLogout }) {
         reader.onload = ev => {
             try {
                 const d = JSON.parse(ev.target.result);
-                if (d.fixedBudget) setFixedBudget(d.fixedBudget);
-                if (d.actualBudget) setActualBudget(d.actualBudget);
+                if (d.fixedBudget) setFixedBudget({
+                    incomes: d.fixedBudget.incomes || [],
+                    expenses: d.fixedBudget.expenses || []
+                });
+                if (d.actualBudget) setActualBudget({
+                    incomes: d.actualBudget.incomes || [],
+                    expenses: d.actualBudget.expenses || []
+                });
                 if (d.realEstate) setRealEstate(d.realEstate);
                 if (d.companies) setCompanies(d.companies);
                 if (d.borrowedMoney) setBorrowedMoney(d.borrowedMoney);
@@ -1446,8 +1458,8 @@ function App({ currentUser, userModules, onLogout }) {
     const fixedInc = fixedBudget.incomes.reduce((s, i) => s + toMonthly(i.amount, i.type), 0);
     const fixedExp = fixedBudget.expenses.reduce((s, e) => s + toMonthly(e.amount, e.type), 0);
     const fixedBal = fixedInc - fixedExp;
-    const actualInc = byMonth(actualBudget.incomes, month).reduce((s, i) => s + i.amount, 0);
-    const actualExp = byMonth(actualBudget.expenses, month).reduce((s, e) => s + e.amount, 0);
+    const actualInc = byMonth(actualBudget.incomes || [], month).reduce((s, i) => s + i.amount, 0);
+    const actualExp = byMonth(actualBudget.expenses || [], month).reduce((s, e) => s + e.amount, 0);
     const actualBal = actualInc - actualExp;
 
     // Property metrics calculation
@@ -1616,10 +1628,10 @@ function App({ currentUser, userModules, onLogout }) {
         } 
     };
     const delFE = id => setFixedBudget(p => ({ ...p, expenses: p.expenses.filter(e => e.id !== id) }));
-    const addAI = () => { if (newAI.name && newAI.amount > 0) { setActualBudget(p => ({ ...p, incomes: [...p.incomes, { ...newAI, id: Date.now() }] })); setNewAI({ name: '', amount: 0, date: new Date().toISOString().split('T')[0], note: '' }); } };
-    const delAI = id => setActualBudget(p => ({ ...p, incomes: p.incomes.filter(i => i.id !== id) }));
-    const addAE = () => { if (newAE.name && newAE.amount > 0) { setActualBudget(p => ({ ...p, expenses: [...p.expenses, { ...newAE, id: Date.now() }] })); setNewAE({ name: '', amount: 0, date: new Date().toISOString().split('T')[0], category: '', note: '' }); } };
-    const delAE = id => setActualBudget(p => ({ ...p, expenses: p.expenses.filter(e => e.id !== id) }));
+    const addAI = () => { if (newAI.name && newAI.amount > 0) { setActualBudget(p => ({ ...p, incomes: [...(p.incomes || []), { ...newAI, id: Date.now() }] })); setNewAI({ name: '', amount: 0, date: new Date().toISOString().split('T')[0], note: '' }); } };
+    const delAI = id => setActualBudget(p => ({ ...p, incomes: (p.incomes || []).filter(i => i.id !== id) }));
+    const addAE = () => { if (newAE.name && newAE.amount > 0) { setActualBudget(p => ({ ...p, expenses: [...(p.expenses || []), { ...newAE, id: Date.now() }] })); setNewAE({ name: '', amount: 0, date: new Date().toISOString().split('T')[0], category: '', note: '' }); } };
+    const delAE = id => setActualBudget(p => ({ ...p, expenses: (p.expenses || []).filter(e => e.id !== id) }));
 
     if (loading) return <div className="min-h-screen animated-bg flex items-center justify-center"><div className="text-center"><div className="animate-spin rounded-full h-16 w-16 border-4 border-white/30 border-t-white mx-auto mb-4"></div><p className="text-white/80 text-lg">Loading WealthWise...</p></div></div>;
 
@@ -3782,7 +3794,7 @@ function App({ currentUser, userModules, onLogout }) {
                                 <div className="space-y-2">
                                     {fixedBudget.incomes.map(function(i) {
                                         var monthlyAmt = toMonthly(i.amount || 0, i.type);
-                                        var isAdded = byMonth(actualBudget.incomes, month).some(function(a) { return a.name === i.name; });
+                                        var isAdded = byMonth(actualBudget.incomes || [], month).some(function(a) { return a.name === i.name; });
                                         return (
                                             <div key={i.id} className={'flex justify-between items-center p-3 rounded-lg ' + (isAdded ? 'bg-green-200' : 'bg-white')}>
                                                 <div className="flex items-center gap-2">
@@ -3826,7 +3838,7 @@ function App({ currentUser, userModules, onLogout }) {
                                 <div className="space-y-2">
                                     {fixedBudget.expenses.map(function(e) {
                                         var monthlyAmt = toMonthly(e.amount || 0, e.type);
-                                        var isAdded = byMonth(actualBudget.expenses, month).some(function(a) { return a.name === e.name; });
+                                        var isAdded = byMonth(actualBudget.expenses || [], month).some(function(a) { return a.name === e.name; });
                                         return (
                                             <div key={e.id} className={'flex justify-between items-center p-3 rounded-lg ' + (isAdded ? 'bg-red-200' : 'bg-white')}>
                                                 <div className="flex items-center gap-2">
@@ -3869,7 +3881,7 @@ function App({ currentUser, userModules, onLogout }) {
                                 <button type="button" onClick={addAI} className="bg-green-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
                             </div>
                             <div className="space-y-2">
-                                {byMonth(actualBudget.incomes,month).map(i=>(
+                                {byMonth(actualBudget.incomes || [],month).map(i=>(
                                     <div key={i.id} className="flex justify-between items-center bg-green-50 p-3 rounded-lg">
                                         <div className="flex items-center gap-2">
                                             <span>{i.name}</span>
@@ -3888,7 +3900,7 @@ function App({ currentUser, userModules, onLogout }) {
                                         </div>
                                     </div>
                                 ))}
-                                {byMonth(actualBudget.incomes,month).length === 0 && <p className="text-gray-400 text-center py-4">No income recorded this month</p>}
+                                {byMonth(actualBudget.incomes || [],month).length === 0 && <p className="text-gray-400 text-center py-4">No income recorded this month</p>}
                             </div>
                         </div>
 
@@ -3903,7 +3915,7 @@ function App({ currentUser, userModules, onLogout }) {
                                 <button type="button" onClick={addAE} className="bg-indigo-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
                             </div>
                             <div className="space-y-2">
-                                {byMonth(actualBudget.expenses,month).map(e=>(
+                                {byMonth(actualBudget.expenses || [],month).map(e=>(
                                     <div key={e.id} className="flex justify-between items-center bg-red-50 p-3 rounded-lg">
                                         <div className="flex items-center gap-2">
                                             <span>{e.name}</span>
@@ -3922,7 +3934,7 @@ function App({ currentUser, userModules, onLogout }) {
                                         </div>
                                     </div>
                                 ))}
-                                {byMonth(actualBudget.expenses,month).length === 0 && <p className="text-gray-400 text-center py-4">No expenses recorded this month</p>}
+                                {byMonth(actualBudget.expenses || [],month).length === 0 && <p className="text-gray-400 text-center py-4">No expenses recorded this month</p>}
                             </div>
                         </div>
                     </div>
