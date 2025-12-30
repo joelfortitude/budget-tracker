@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <meta charset="UTF-8">
+<head>
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Budget &amp; Investment Tracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -40,52 +40,88 @@ const LogOut = () => <Icon d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5
 const toast = (ok, msg) => { const t = document.getElementById('toast'); t.className = 'toast ' + (ok ? 'ok' : 'err'); t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2500); };
 
 // GitHub Gist Storage Configuration
-const GITHUB_TOKEN = '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';
+const GITHUB_TOKEN = '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';
 const GIST_FILENAME = 'budget_tracker_data.json';
 let GIST_ID = localStorage.getItem('budgetGistId') || null;
 let gistData = null;
 let gistLoaded = false;
 let gistSaving = false;
+let gistError = null;
 
 // GitHub Gist API functions
 const gistApi = {
     async loadGist() {
+        console.log('Loading Gist... GIST_ID:', GIST_ID);
         try {
+            // First try to load by ID if we have one
             if (GIST_ID) {
+                console.log('Fetching existing gist:', GIST_ID);
                 const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
                     headers: { 'Authorization': `token ${GITHUB_TOKEN}` }
                 });
+                console.log('Gist fetch response:', res.status);
                 if (res.ok) {
                     const gist = await res.json();
-                    if (gist.files[GIST_FILENAME]) {
+                    if (gist.files && gist.files[GIST_FILENAME]) {
                         gistData = JSON.parse(gist.files[GIST_FILENAME].content);
+                        console.log('Loaded gist data:', gistData);
+                        gistLoaded = true;
+                        return gistData;
+                    }
+                } else {
+                    // Gist ID invalid, clear it
+                    console.log('Gist ID invalid, clearing');
+                    GIST_ID = null;
+                    localStorage.removeItem('budgetGistId');
+                }
+            }
+            
+            // Find existing gist by filename
+            console.log('Searching for existing gist...');
+            const listRes = await fetch('https://api.github.com/gists?per_page=100', {
+                headers: { 'Authorization': `token ${GITHUB_TOKEN}` }
+            });
+            console.log('Gist list response:', listRes.status);
+            
+            if (listRes.ok) {
+                const gists = await listRes.json();
+                console.log('Found', gists.length, 'gists');
+                const existing = gists.find(g => g.files && g.files[GIST_FILENAME]);
+                if (existing) {
+                    console.log('Found existing gist:', existing.id);
+                    GIST_ID = existing.id;
+                    localStorage.setItem('budgetGistId', GIST_ID);
+                    
+                    // Fetch full content
+                    const fullRes = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                        headers: { 'Authorization': `token ${GITHUB_TOKEN}` }
+                    });
+                    if (fullRes.ok) {
+                        const fullGist = await fullRes.json();
+                        gistData = JSON.parse(fullGist.files[GIST_FILENAME].content);
+                        console.log('Loaded existing gist data:', gistData);
                         gistLoaded = true;
                         return gistData;
                     }
                 }
+            } else {
+                const errText = await listRes.text();
+                console.error('Gist list error:', errText);
+                gistError = 'GitHub API error: ' + listRes.status;
             }
-            // Find existing gist or create new
-            const listRes = await fetch('https://api.github.com/gists', {
-                headers: { 'Authorization': `token ${GITHUB_TOKEN}` }
-            });
-            if (listRes.ok) {
-                const gists = await listRes.json();
-                const existing = gists.find(g => g.files[GIST_FILENAME]);
-                if (existing) {
-                    GIST_ID = existing.id;
-                    localStorage.setItem('budgetGistId', GIST_ID);
-                    gistData = JSON.parse(existing.files[GIST_FILENAME].content);
-                    gistLoaded = true;
-                    return gistData;
-                }
-            }
+            
             // Create new gist
+            console.log('Creating new gist...');
             gistData = { admin: null, users: [], userData: {} };
-            await gistApi.saveGist();
+            const created = await gistApi.saveGist();
+            if (created) {
+                console.log('Created new gist:', GIST_ID);
+            }
             gistLoaded = true;
             return gistData;
         } catch (e) {
             console.error('Gist load error:', e);
+            gistError = e.message;
             gistData = { admin: null, users: [], userData: {} };
             gistLoaded = true;
             return gistData;
@@ -93,35 +129,60 @@ const gistApi = {
     },
     
     async saveGist() {
-        if (gistSaving || !gistData) return;
+        if (gistSaving || !gistData) return false;
         gistSaving = true;
+        console.log('Saving gist...', GIST_ID ? 'updating' : 'creating');
         try {
             const body = {
                 description: 'Budget Tracker Data - DO NOT DELETE',
                 files: { [GIST_FILENAME]: { content: JSON.stringify(gistData, null, 2) } }
             };
+            
+            let res;
             if (GIST_ID) {
-                await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
                     method: 'PATCH',
-                    headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Authorization': `token ${GITHUB_TOKEN}`, 
+                        'Content-Type': 'application/json' 
+                    },
                     body: JSON.stringify(body)
                 });
             } else {
-                const res = await fetch('https://api.github.com/gists', {
+                res = await fetch('https://api.github.com/gists', {
                     method: 'POST',
-                    headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Authorization': `token ${GITHUB_TOKEN}`, 
+                        'Content-Type': 'application/json' 
+                    },
                     body: JSON.stringify({ ...body, public: false })
                 });
+                
                 if (res.ok) {
                     const gist = await res.json();
                     GIST_ID = gist.id;
                     localStorage.setItem('budgetGistId', GIST_ID);
+                    console.log('Created gist with ID:', GIST_ID);
                 }
             }
+            
+            console.log('Save response:', res.status);
+            if (!res.ok) {
+                const errText = await res.text();
+                console.error('Save error:', errText);
+                gistError = 'Save failed: ' + res.status;
+                gistSaving = false;
+                return false;
+            }
+            
+            gistSaving = false;
+            return true;
         } catch (e) {
             console.error('Gist save error:', e);
+            gistError = e.message;
+            gistSaving = false;
+            return false;
         }
-        gistSaving = false;
     }
 };
 
@@ -3305,10 +3366,21 @@ function MainApp() {
     const [userModules, setUserModules] = useState(null);
     const [checkingSession, setCheckingSession] = useState(true);
     const [gistReady, setGistReady] = useState(false);
+    const [loadError, setLoadError] = useState(null);
     
     // Load Gist data first
     useEffect(() => {
-        gistApi.loadGist().then(() => {
+        console.log('MainApp: Starting gist load...');
+        gistApi.loadGist().then((data) => {
+            console.log('MainApp: Gist loaded, data:', data);
+            console.log('MainApp: Admin exists:', !!data?.admin);
+            if (gistError) {
+                setLoadError(gistError);
+            }
+            setGistReady(true);
+        }).catch(e => {
+            console.error('MainApp: Gist load failed:', e);
+            setLoadError(e.message);
             setGistReady(true);
         });
     }, []);
@@ -3318,10 +3390,12 @@ function MainApp() {
         if (!gistReady) return;
         
         const session = getSession();
+        console.log('MainApp: Checking session:', session);
         if (session) {
             // Verify session is still valid
             if (session.isAdmin) {
                 const admin = getAdmin();
+                console.log('MainApp: Admin check:', admin);
                 if (admin) {
                     setCurrentUser(session);
                 }
@@ -3358,6 +3432,8 @@ function MainApp() {
             <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
                 <p className="text-gray-600">Loading data from cloud...</p>
+                {loadError && <p className="text-red-500 mt-2 text-sm">Error: {loadError}</p>}
+                <p className="text-xs text-gray-400 mt-4">Check browser console (F12) for details</p>
             </div>
         </div>;
     }
