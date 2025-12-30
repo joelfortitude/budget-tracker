@@ -359,8 +359,11 @@ const PieChart = ({ data, title, size = 200, showLegend = true, showValues = tru
     );
 };
 
-// Donut Chart with Center Info
-const DonutChart = ({ data, title, centerLabel, centerValue, size = 180 }) => {
+// Donut Chart with Center Info and Hover Popup
+const DonutChart = ({ data, title, centerLabel, centerValue, size = 180, items = [] }) => {
+    const [hoveredSlice, setHoveredSlice] = React.useState(null);
+    const [mousePos, setMousePos] = React.useState({ x: 0, y: 0 });
+    
     if (!data || data.length === 0 || data.reduce((s, d) => s + d.value, 0) === 0) {
         return (
             <div className="flex flex-col items-center justify-center p-4 bg-white rounded-xl shadow">
@@ -410,18 +413,27 @@ const DonutChart = ({ data, title, centerLabel, centerValue, size = 180 }) => {
         
         const pathData = `M ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} L ${ix2} ${iy2} A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${ix1} ${iy1} Z`;
         
+        // Get items for this category
+        const categoryItems = items.filter(i => (i.category || 'Uncategorized') === item.name);
+        
         return {
             ...item,
             path: pathData,
             color: item.color || colors[index % colors.length],
-            percentage
+            percentage,
+            categoryItems
         };
     });
     
+    const handleMouseMove = (e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    };
+    
     return (
-        <div className="flex flex-col items-center bg-white rounded-xl shadow p-4">
+        <div className="flex flex-col items-center bg-white rounded-xl shadow p-4 relative">
             {title && <p className="text-sm font-bold text-gray-700 mb-2">{title}</p>}
-            <div className="relative">
+            <div className="relative" onMouseMove={handleMouseMove}>
                 <svg width={size} height={size}>
                     {arcs.map((arc, i) => (
                         <path
@@ -430,20 +442,71 @@ const DonutChart = ({ data, title, centerLabel, centerValue, size = 180 }) => {
                             fill={arc.color}
                             stroke="white"
                             strokeWidth="2"
-                            className="transition-all duration-300 hover:opacity-75 cursor-pointer"
-                        >
-                            <title>{arc.name}: ${arc.value.toLocaleString()} ({arc.percentage.toFixed(1)}%)</title>
-                        </path>
+                            className="transition-all duration-300 cursor-pointer"
+                            style={{ 
+                                opacity: hoveredSlice === i ? 0.85 : 1,
+                                transform: hoveredSlice === i ? 'scale(1.02)' : 'scale(1)',
+                                transformOrigin: 'center'
+                            }}
+                            onMouseEnter={() => setHoveredSlice(i)}
+                            onMouseLeave={() => setHoveredSlice(null)}
+                        />
                     ))}
                 </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <span className="text-xs text-gray-500">{centerLabel || 'Total'}</span>
                     <span className="text-lg font-bold text-gray-800">{centerValue || formatUSD(total)}</span>
                 </div>
+                
+                {/* Hover Popup */}
+                {hoveredSlice !== null && arcs[hoveredSlice] && (
+                    <div 
+                        className="absolute z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-3 min-w-48 max-w-64 pointer-events-none"
+                        style={{ 
+                            left: mousePos.x + 10, 
+                            top: mousePos.y - 10,
+                            transform: mousePos.x > size / 2 ? 'translateX(-110%)' : 'translateX(0)'
+                        }}
+                    >
+                        <div className="flex items-center gap-2 mb-2 pb-2 border-b">
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: arcs[hoveredSlice].color }} />
+                            <span className="font-bold text-gray-800">{arcs[hoveredSlice].name}</span>
+                        </div>
+                        <div className="flex justify-between text-sm mb-2">
+                            <span className="text-gray-500">Total:</span>
+                            <span className="font-bold text-gray-800">${arcs[hoveredSlice].value.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-sm mb-2">
+                            <span className="text-gray-500">Percentage:</span>
+                            <span className="font-medium text-gray-700">{arcs[hoveredSlice].percentage.toFixed(1)}%</span>
+                        </div>
+                        {arcs[hoveredSlice].categoryItems && arcs[hoveredSlice].categoryItems.length > 0 && (
+                            <div className="mt-2 pt-2 border-t">
+                                <p className="text-xs text-gray-500 mb-1 font-medium">Items in this category:</p>
+                                <div className="max-h-32 overflow-y-auto space-y-1">
+                                    {arcs[hoveredSlice].categoryItems.slice(0, 8).map((item, idx) => (
+                                        <div key={idx} className="flex justify-between text-xs bg-gray-50 px-2 py-1 rounded">
+                                            <span className="text-gray-600 truncate max-w-28">{item.name}</span>
+                                            <span className="font-medium text-gray-800">${(parseFloat(item.amount) || 0).toLocaleString()}</span>
+                                        </div>
+                                    ))}
+                                    {arcs[hoveredSlice].categoryItems.length > 8 && (
+                                        <p className="text-xs text-gray-400 text-center">+{arcs[hoveredSlice].categoryItems.length - 8} more</p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
             <div className="mt-3 space-y-1 w-full max-h-28 overflow-y-auto">
                 {arcs.map((arc, i) => (
-                    <div key={i} className="flex items-center justify-between text-xs px-1">
+                    <div 
+                        key={i} 
+                        className={`flex items-center justify-between text-xs px-1 rounded cursor-pointer transition-all ${hoveredSlice === i ? 'bg-gray-100' : ''}`}
+                        onMouseEnter={() => setHoveredSlice(i)}
+                        onMouseLeave={() => setHoveredSlice(null)}
+                    >
                         <div className="flex items-center gap-2">
                             <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: arc.color }} />
                             <span className="text-gray-600 truncate max-w-20">{arc.name}</span>
@@ -458,49 +521,49 @@ const DonutChart = ({ data, title, centerLabel, centerValue, size = 180 }) => {
 
 const toast = (ok, msg) => { const t = document.getElementById('toast'); t.className = 'toast ' + (ok ? 'ok' : 'err'); t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2500); };
 
-// Wisdom Quotes
+// Wisdom Quotes with icons
 const budgetQuotes = [
-    { quote: "A budget is telling your money where to go instead of wondering where it went.", author: "Dave Ramsey" },
-    { quote: "The goal isn't more money. The goal is living life on your terms.", author: "Chris Brogan" },
-    { quote: "Beware of little expenses; a small leak will sink a great ship.", author: "Benjamin Franklin" },
-    { quote: "It's not your salary that makes you rich, it's your spending habits.", author: "Charles A. Jaffe" },
-    { quote: "A penny saved is a penny earned.", author: "Benjamin Franklin" },
-    { quote: "Don't tell me where your priorities are. Show me where you spend your money and I'll tell you what they are.", author: "James W. Frick" },
-    { quote: "The habit of saving is itself an education; it fosters every virtue, teaches self-denial, cultivates the sense of order.", author: "T.T. Munger" },
-    { quote: "Financial peace isn't the acquisition of stuff. It's learning to live on less than you make.", author: "Dave Ramsey" },
-    { quote: "You must gain control over your money or the lack of it will forever control you.", author: "Dave Ramsey" },
-    { quote: "The art is not in making money, but in keeping it.", author: "Proverb" },
-    { quote: "Never spend your money before you have earned it.", author: "Thomas Jefferson" },
-    { quote: "Too many people spend money they haven't earned to buy things they don't want to impress people they don't like.", author: "Will Rogers" },
+    { quote: "A budget is telling your money where to go instead of wondering where it went.", author: "Dave Ramsey", icon: "🎯" },
+    { quote: "The goal isn't more money. The goal is living life on your terms.", author: "Chris Brogan", icon: "🌟" },
+    { quote: "Beware of little expenses; a small leak will sink a great ship.", author: "Benjamin Franklin", icon: "🚢" },
+    { quote: "It's not your salary that makes you rich, it's your spending habits.", author: "Charles A. Jaffe", icon: "💸" },
+    { quote: "A penny saved is a penny earned.", author: "Benjamin Franklin", icon: "🪙" },
+    { quote: "Don't tell me where your priorities are. Show me where you spend your money and I'll tell you what they are.", author: "James W. Frick", icon: "🔍" },
+    { quote: "The habit of saving is itself an education; it fosters every virtue, teaches self-denial, cultivates the sense of order.", author: "T.T. Munger", icon: "📚" },
+    { quote: "Financial peace isn't the acquisition of stuff. It's learning to live on less than you make.", author: "Dave Ramsey", icon: "☮️" },
+    { quote: "You must gain control over your money or the lack of it will forever control you.", author: "Dave Ramsey", icon: "🎮" },
+    { quote: "The art is not in making money, but in keeping it.", author: "Proverb", icon: "🎨" },
+    { quote: "Never spend your money before you have earned it.", author: "Thomas Jefferson", icon: "⏳" },
+    { quote: "Too many people spend money they haven't earned to buy things they don't want to impress people they don't like.", author: "Will Rogers", icon: "🎭" },
 ];
 
 const investmentQuotes = [
-    { quote: "The stock market is filled with individuals who know the price of everything, but the value of nothing.", author: "Warren Buffett" },
-    { quote: "Rule No. 1: Never lose money. Rule No. 2: Never forget Rule No. 1.", author: "Warren Buffett" },
-    { quote: "Price is what you pay. Value is what you get.", author: "Warren Buffett" },
-    { quote: "Be fearful when others are greedy and greedy when others are fearful.", author: "Warren Buffett" },
-    { quote: "The best investment you can make is in yourself.", author: "Warren Buffett" },
-    { quote: "Risk comes from not knowing what you're doing.", author: "Warren Buffett" },
-    { quote: "It's far better to buy a wonderful company at a fair price than a fair company at a wonderful price.", author: "Warren Buffett" },
-    { quote: "In the short run, the market is a voting machine but in the long run, it is a weighing machine.", author: "Benjamin Graham" },
-    { quote: "The individual investor should act consistently as an investor and not as a speculator.", author: "Benjamin Graham" },
-    { quote: "The four most dangerous words in investing are: 'This time it's different.'", author: "Sir John Templeton" },
-    { quote: "Know what you own, and know why you own it.", author: "Peter Lynch" },
-    { quote: "How many millionaires do you know who have become wealthy by investing in savings accounts?", author: "Robert G. Allen" },
+    { quote: "The stock market is filled with individuals who know the price of everything, but the value of nothing.", author: "Warren Buffett", icon: "📊" },
+    { quote: "Rule No. 1: Never lose money. Rule No. 2: Never forget Rule No. 1.", author: "Warren Buffett", icon: "📏" },
+    { quote: "Price is what you pay. Value is what you get.", author: "Warren Buffett", icon: "💎" },
+    { quote: "Be fearful when others are greedy and greedy when others are fearful.", author: "Warren Buffett", icon: "🦁" },
+    { quote: "The best investment you can make is in yourself.", author: "Warren Buffett", icon: "🧠" },
+    { quote: "Risk comes from not knowing what you're doing.", author: "Warren Buffett", icon: "⚠️" },
+    { quote: "It's far better to buy a wonderful company at a fair price than a fair company at a wonderful price.", author: "Warren Buffett", icon: "⭐" },
+    { quote: "In the short run, the market is a voting machine but in the long run, it is a weighing machine.", author: "Benjamin Graham", icon: "⚖️" },
+    { quote: "The individual investor should act consistently as an investor and not as a speculator.", author: "Benjamin Graham", icon: "🧘" },
+    { quote: "The four most dangerous words in investing are: 'This time it's different.'", author: "Sir John Templeton", icon: "🚨" },
+    { quote: "Know what you own, and know why you own it.", author: "Peter Lynch", icon: "🔑" },
+    { quote: "How many millionaires do you know who have become wealthy by investing in savings accounts?", author: "Robert G. Allen", icon: "🏦" },
 ];
 
 const realEstateQuotes = [
-    { quote: "Real estate cannot be lost or stolen, nor can it be carried away. Purchased with common sense, paid for in full, and managed with reasonable care, it is about the safest investment in the world.", author: "Franklin D. Roosevelt" },
-    { quote: "Landlords grow rich in their sleep without working, risking or economizing.", author: "John Stuart Mill" },
-    { quote: "Don't wait to buy real estate. Buy real estate and wait.", author: "Will Rogers" },
-    { quote: "The best investment on Earth is earth.", author: "Louis Glickman" },
-    { quote: "Real estate is an imperishable asset, ever increasing in value.", author: "Russell Sage" },
-    { quote: "Buy land, they're not making it anymore.", author: "Mark Twain" },
-    { quote: "In real estate, you make 10% of your money because you're a genius and 90% because you catch a great wave.", author: "Jeff Greene" },
-    { quote: "Ninety percent of all millionaires become so through owning real estate.", author: "Andrew Carnegie" },
+    { quote: "Real estate cannot be lost or stolen, nor can it be carried away. Purchased with common sense, paid for in full, and managed with reasonable care, it is about the safest investment in the world.", author: "Franklin D. Roosevelt", icon: "🏛️" },
+    { quote: "Landlords grow rich in their sleep without working, risking or economizing.", author: "John Stuart Mill", icon: "😴" },
+    { quote: "Don't wait to buy real estate. Buy real estate and wait.", author: "Will Rogers", icon: "⏰" },
+    { quote: "The best investment on Earth is earth.", author: "Louis Glickman", icon: "🌍" },
+    { quote: "Real estate is an imperishable asset, ever increasing in value.", author: "Russell Sage", icon: "📈" },
+    { quote: "Buy land, they're not making it anymore.", author: "Mark Twain", icon: "🗺️" },
+    { quote: "In real estate, you make 10% of your money because you're a genius and 90% because you catch a great wave.", author: "Jeff Greene", icon: "🏄" },
+    { quote: "Ninety percent of all millionaires become so through owning real estate.", author: "Andrew Carnegie", icon: "💰" },
 ];
 
-// Random Quote Component
+// Random Quote Component with Icon
 const WisdomQuote = ({ type = 'budget' }) => {
     const quotes = type === 'budget' ? budgetQuotes : type === 'investment' ? investmentQuotes : realEstateQuotes;
     const [currentQuote, setCurrentQuote] = React.useState(() => quotes[Math.floor(Math.random() * quotes.length)]);
@@ -524,14 +587,16 @@ const WisdomQuote = ({ type = 'budget' }) => {
     
     return (
         <div className={`bg-gradient-to-r ${bgColors[type]} border rounded-xl p-4 relative overflow-hidden`}>
-            <div className="absolute top-2 right-2 opacity-10 text-6xl">💡</div>
+            <div className="absolute top-2 right-2 opacity-20 text-6xl">{currentQuote.icon || '💡'}</div>
             <div className="flex items-start gap-3">
-                <span className={`text-2xl ${iconColors[type]}`}>💬</span>
+                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-white shadow-md flex items-center justify-center text-2xl">
+                    {currentQuote.icon || '💬'}
+                </div>
                 <div className="flex-1">
                     <p className="text-gray-700 italic text-sm leading-relaxed">"{currentQuote.quote}"</p>
                     <p className="text-gray-500 text-xs mt-2 font-semibold">— {currentQuote.author}</p>
                 </div>
-                <button onClick={nextQuote} className="text-gray-400 hover:text-gray-600 text-xs">↻ New</button>
+                <button onClick={nextQuote} className="text-gray-400 hover:text-gray-600 text-xs bg-white/50 px-2 py-1 rounded-full">↻ New</button>
             </div>
         </div>
     );
@@ -1328,6 +1393,8 @@ function App({ currentUser, userModules, onLogout }) {
     const [editingActualIncome, setEditingActualIncome] = useState(null);
     const [editingActualExpense, setEditingActualExpense] = useState(null);
     const [showQuickAdd, setShowQuickAdd] = useState(false);
+    const [autoPopItem, setAutoPopItem] = useState(null); // {type: 'income'|'expense', id: number}
+    const [autoPopRange, setAutoPopRange] = useState({ from: new Date().toISOString().slice(0,7), to: new Date().toISOString().slice(0,7) });
     const [showAnalyzer, setShowAnalyzer] = useState(false);
     const [showInvAnalyzer, setShowInvAnalyzer] = useState(false);
     const [viewingReport, setViewingReport] = useState(null);
@@ -2175,6 +2242,46 @@ function App({ currentUser, userModules, onLogout }) {
         });
     };
 
+    // Auto-populate a single item to multiple months
+    const autoPopulateItem = (item, type, fromMonth, toMonth) => {
+        const from = new Date(fromMonth + '-01');
+        const to = new Date(toMonth + '-01');
+        
+        if (from > to) { toast(false, 'From must be before To'); return; }
+        
+        const monthlyAmt = toMonthly(item.amount || 0, item.type);
+        if (monthlyAmt <= 0) { toast(false, 'Item has no amount'); return; }
+        
+        let newIncomes = [...(actualBudget.incomes || [])];
+        let newExpenses = [...(actualBudget.expenses || [])];
+        let addedCount = 0;
+        
+        const current = new Date(from);
+        while (current <= to) {
+            const dateStr = current.getFullYear() + '-' + String(current.getMonth() + 1).padStart(2, '0') + '-01';
+            
+            if (type === 'income') {
+                const exists = newIncomes.some(a => a.name === item.name && a.date && a.date.startsWith(dateStr.slice(0,7)));
+                if (!exists) {
+                    newIncomes.push({ id: Date.now() + Math.random(), name: item.name, amount: monthlyAmt, date: dateStr, category: item.category || '' });
+                    addedCount++;
+                }
+            } else {
+                const exists = newExpenses.some(a => a.name === item.name && a.date && a.date.startsWith(dateStr.slice(0,7)));
+                if (!exists) {
+                    newExpenses.push({ id: Date.now() + Math.random(), name: item.name, amount: monthlyAmt, date: dateStr, category: item.category || '' });
+                    addedCount++;
+                }
+            }
+            
+            current.setMonth(current.getMonth() + 1);
+        }
+        
+        setActualBudget({ incomes: newIncomes, expenses: newExpenses });
+        setAutoPopItem(null);
+        toast(true, `Added "${item.name}" to ${addedCount} month(s)!`);
+    };
+
     if (loading) return <div className="min-h-screen animated-bg flex items-center justify-center"><div className="text-center"><div className="animate-spin rounded-full h-16 w-16 border-4 border-white/30 border-t-white mx-auto mb-4"></div><p className="text-white/80 text-lg">Loading WealthWise...</p></div></div>;
 
     return (
@@ -2379,6 +2486,7 @@ function App({ currentUser, userModules, onLogout }) {
                                             });
                                             return Object.entries(categories).map(([name, value]) => ({ name, value }));
                                         })()}
+                                        items={(fixedBudget.incomes || []).map(i => ({...i, amount: toMonthly(i.amount || 0, i.type)}))}
                                         centerLabel="Monthly"
                                         size={160}
                                     />
@@ -2395,6 +2503,7 @@ function App({ currentUser, userModules, onLogout }) {
                                             });
                                             return Object.entries(categories).map(([name, value]) => ({ name, value }));
                                         })()}
+                                        items={(fixedBudget.expenses || []).map(e => ({...e, amount: toMonthly(e.amount || 0, e.type)}))}
                                         centerLabel="Monthly"
                                         size={160}
                                     />
@@ -2410,6 +2519,7 @@ function App({ currentUser, userModules, onLogout }) {
                                             });
                                             return Object.entries(categories).map(([name, value]) => ({ name, value }));
                                         })()}
+                                        items={byMonth(actualBudget.incomes || [], month)}
                                         centerLabel={fmtMonth(month).split(' ')[0]}
                                         size={160}
                                     />
@@ -2425,6 +2535,7 @@ function App({ currentUser, userModules, onLogout }) {
                                             });
                                             return Object.entries(categories).map(([name, value]) => ({ name, value }));
                                         })()}
+                                        items={byMonth(actualBudget.expenses || [], month)}
                                         centerLabel={fmtMonth(month).split(' ')[0]}
                                         size={160}
                                     />
@@ -4142,90 +4253,6 @@ function App({ currentUser, userModules, onLogout }) {
                         {/* Wisdom Quote */}
                         <WisdomQuote type="budget" />
                         
-                        {/* Auto-Populate to Actual */}
-                        <div className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl shadow p-5 border border-purple-200">
-                            <div className="flex items-center gap-3 mb-3">
-                                <span className="text-2xl">🔄</span>
-                                <div>
-                                    <h3 className="font-bold text-purple-800">Auto-Populate Budget to Actual Spending</h3>
-                                    <p className="text-sm text-gray-600">Copy your budget items to actual spending for selected months</p>
-                                </div>
-                            </div>
-                            <div className="flex flex-wrap items-end gap-4">
-                                <div>
-                                    <label className="text-xs text-gray-500 block mb-1">From Month</label>
-                                    <input type="month" id="autoPopFrom" defaultValue={new Date().toISOString().slice(0,7)} className="px-3 py-2 border rounded-lg"/>
-                                </div>
-                                <div>
-                                    <label className="text-xs text-gray-500 block mb-1">To Month</label>
-                                    <input type="month" id="autoPopTo" defaultValue={new Date().toISOString().slice(0,7)} className="px-3 py-2 border rounded-lg"/>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <label className="flex items-center gap-2 text-sm">
-                                        <input type="checkbox" id="autoPopIncome" defaultChecked className="rounded"/> Income
-                                    </label>
-                                    <label className="flex items-center gap-2 text-sm">
-                                        <input type="checkbox" id="autoPopExpense" defaultChecked className="rounded"/> Expenses
-                                    </label>
-                                </div>
-                                <button 
-                                    type="button"
-                                    onClick={() => {
-                                        const fromMonth = document.getElementById('autoPopFrom').value;
-                                        const toMonth = document.getElementById('autoPopTo').value;
-                                        const includeIncome = document.getElementById('autoPopIncome').checked;
-                                        const includeExpense = document.getElementById('autoPopExpense').checked;
-                                        
-                                        if (!fromMonth || !toMonth) { toast(false, 'Select months'); return; }
-                                        
-                                        const from = new Date(fromMonth + '-01');
-                                        const to = new Date(toMonth + '-01');
-                                        
-                                        if (from > to) { toast(false, 'From month must be before To month'); return; }
-                                        
-                                        let newIncomes = [...(actualBudget.incomes || [])];
-                                        let newExpenses = [...(actualBudget.expenses || [])];
-                                        let addedCount = 0;
-                                        
-                                        const current = new Date(from);
-                                        while (current <= to) {
-                                            const dateStr = current.getFullYear() + '-' + String(current.getMonth() + 1).padStart(2, '0') + '-01';
-                                            
-                                            if (includeIncome) {
-                                                (fixedBudget.incomes || []).forEach(i => {
-                                                    const monthlyAmt = toMonthly(i.amount || 0, i.type);
-                                                    const exists = newIncomes.some(a => a.name === i.name && a.date.startsWith(dateStr.slice(0,7)));
-                                                    if (!exists && monthlyAmt > 0) {
-                                                        newIncomes.push({ id: Date.now() + Math.random(), name: i.name, amount: monthlyAmt, date: dateStr, category: i.category || '' });
-                                                        addedCount++;
-                                                    }
-                                                });
-                                            }
-                                            
-                                            if (includeExpense) {
-                                                (fixedBudget.expenses || []).forEach(e => {
-                                                    const monthlyAmt = toMonthly(e.amount || 0, e.type);
-                                                    const exists = newExpenses.some(a => a.name === e.name && a.date.startsWith(dateStr.slice(0,7)));
-                                                    if (!exists && monthlyAmt > 0) {
-                                                        newExpenses.push({ id: Date.now() + Math.random(), name: e.name, amount: monthlyAmt, date: dateStr, category: e.category || '' });
-                                                        addedCount++;
-                                                    }
-                                                });
-                                            }
-                                            
-                                            current.setMonth(current.getMonth() + 1);
-                                        }
-                                        
-                                        setActualBudget({ incomes: newIncomes, expenses: newExpenses });
-                                        toast(true, `Added ${addedCount} items to Actual Spending!`);
-                                    }}
-                                    className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-semibold transition-all"
-                                >
-                                    🚀 Populate
-                                </button>
-                            </div>
-                        </div>
-                        
                         <div className="grid grid-cols-2 gap-4">
                             <div className="bg-white rounded-xl shadow p-4"><h3 className="font-bold mb-2">Monthly</h3><div className="flex justify-between"><span>Income:</span><span className="font-bold text-green-600">{formatUSD(fixedInc)}</span></div><div className="flex justify-between"><span>Expenses:</span><span className="font-bold text-red-600">{formatUSD(fixedExp)}</span></div><div className="flex justify-between pt-2 border-t mt-2"><span className="font-semibold">Balance:</span><span className={`font-bold text-lg ${fixedBal>=0?'text-blue-600':'text-orange-600'}`}>{formatUSD(fixedBal)}</span></div></div>
                             <div className="bg-white rounded-xl shadow p-4"><h3 className="font-bold mb-2">Annual</h3><div className="flex justify-between"><span>Income:</span><span className="font-bold text-green-600">{formatUSD(fixedInc*12)}</span></div><div className="flex justify-between"><span>Expenses:</span><span className="font-bold text-red-600">{formatUSD(fixedExp*12)}</span></div><div className="flex justify-between pt-2 border-t mt-2"><span className="font-semibold">Balance:</span><span className={`font-bold text-lg ${fixedBal>=0?'text-blue-600':'text-orange-600'}`}>{formatUSD(fixedBal*12)}</span></div></div>
@@ -4502,28 +4529,73 @@ function App({ currentUser, userModules, onLogout }) {
                                 <button type="button" onClick={addFI} className="bg-green-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
                             </div>
                             <div className="space-y-2">{(fixedBudget.incomes || []).map(i=>(
-                                <div key={i.id} className="flex justify-between items-center bg-green-50 p-3 rounded-lg flex-wrap gap-2">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="font-medium">{i.name}</span>
-                                        {i.category&&<span className="text-xs bg-gray-200 px-2 py-0.5 rounded">{i.category}</span>}
-                                        {i.note&&<span className="text-xs text-gray-500 italic">📝 {i.note}</span>}
+                                <div key={i.id} className="bg-green-50 p-3 rounded-lg">
+                                    <div className="flex justify-between items-center flex-wrap gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="font-medium">{i.name}</span>
+                                            {i.category&&<span className="text-xs bg-gray-200 px-2 py-0.5 rounded">{i.category}</span>}
+                                            {i.note&&<span className="text-xs text-gray-500 italic">📝 {i.note}</span>}
+                                        </div>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-gray-500">$</span>
+                                            <input type="number" defaultValue={i.amount||''} onBlur={e=>{const amt=parseFloat(e.target.value)||0;setFixedBudget(p=>({...p,incomes:p.incomes.map(x=>x.id===i.id?{...x,amount:amt}:x)}));}} className="w-24 px-2 py-1 border rounded text-sm text-right" placeholder="0"/>
+                                            <select value={i.type} onChange={e=>setFixedBudget(p=>({...p,incomes:p.incomes.map(x=>x.id===i.id?{...x,type:e.target.value}:x)}))} className="px-2 py-1 border rounded text-sm bg-white">
+                                                <option value="weekly">Weekly</option>
+                                                <option value="biweekly">Bi-Weekly</option>
+                                                <option value="semimonthly">Semi-Monthly</option>
+                                                <option value="monthly">Monthly</option>
+                                                <option value="quarterly">Quarterly</option>
+                                                <option value="semiannually">Semi-Annually</option>
+                                                <option value="yearly">Yearly</option>
+                                            </select>
+                                            <input defaultValue={i.note||''} onBlur={e=>setFixedBudget(p=>({...p,incomes:p.incomes.map(x=>x.id===i.id?{...x,note:e.target.value}:x)}))} className="w-32 px-2 py-1 border rounded text-sm" placeholder="Note"/>
+                                            {i.type!=='monthly'&&i.amount>0&&<span className="text-xs text-gray-500 whitespace-nowrap">≈{formatUSD(toMonthly(i.amount,i.type))}/mo</span>}
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setAutoPopItem(autoPopItem?.id === i.id ? null : {type: 'income', id: i.id, item: i})}
+                                                className={`px-2 py-1 rounded text-xs font-medium transition-all ${autoPopItem?.id === i.id ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'}`}
+                                                title="Auto-populate to actual"
+                                            >
+                                                🔄
+                                            </button>
+                                            <button onClick={()=>delFI(i.id)} className="text-red-500 ml-1"><Trash/></button>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-gray-500">$</span>
-                                        <input type="number" defaultValue={i.amount||''} onBlur={e=>{const amt=parseFloat(e.target.value)||0;setFixedBudget(p=>({...p,incomes:p.incomes.map(x=>x.id===i.id?{...x,amount:amt}:x)}));}} className="w-24 px-2 py-1 border rounded text-sm text-right" placeholder="0"/>
-                                        <select value={i.type} onChange={e=>setFixedBudget(p=>({...p,incomes:p.incomes.map(x=>x.id===i.id?{...x,type:e.target.value}:x)}))} className="px-2 py-1 border rounded text-sm bg-white">
-                                            <option value="weekly">Weekly</option>
-                                            <option value="biweekly">Bi-Weekly</option>
-                                            <option value="semimonthly">Semi-Monthly</option>
-                                            <option value="monthly">Monthly</option>
-                                            <option value="quarterly">Quarterly</option>
-                                            <option value="semiannually">Semi-Annually</option>
-                                            <option value="yearly">Yearly</option>
-                                        </select>
-                                        <input defaultValue={i.note||''} onBlur={e=>setFixedBudget(p=>({...p,incomes:p.incomes.map(x=>x.id===i.id?{...x,note:e.target.value}:x)}))} className="w-32 px-2 py-1 border rounded text-sm" placeholder="Note"/>
-                                        {i.type!=='monthly'&&i.amount>0&&<span className="text-xs text-gray-500 whitespace-nowrap">≈{formatUSD(toMonthly(i.amount,i.type))}/mo</span>}
-                                        <button onClick={()=>delFI(i.id)} className="text-red-500 ml-1"><Trash/></button>
-                                    </div>
+                                    {/* Auto-populate popup */}
+                                    {autoPopItem?.id === i.id && autoPopItem?.type === 'income' && (
+                                        <div className="mt-2 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="text-xs text-purple-700 font-medium">Add to actual:</span>
+                                                <input 
+                                                    type="month" 
+                                                    value={autoPopRange.from}
+                                                    onChange={e => setAutoPopRange(p => ({...p, from: e.target.value}))}
+                                                    className="px-2 py-1 border rounded text-xs"
+                                                />
+                                                <span className="text-xs text-gray-500">to</span>
+                                                <input 
+                                                    type="month" 
+                                                    value={autoPopRange.to}
+                                                    onChange={e => setAutoPopRange(p => ({...p, to: e.target.value}))}
+                                                    className="px-2 py-1 border rounded text-xs"
+                                                />
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => autoPopulateItem(i, 'income', autoPopRange.from, autoPopRange.to)}
+                                                    className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-xs font-medium"
+                                                >
+                                                    ✓ Add
+                                                </button>
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => setAutoPopItem(null)}
+                                                    className="text-gray-500 hover:text-gray-700 px-2 py-1 text-xs"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ))}</div>
                         </div>
@@ -4554,29 +4626,74 @@ function App({ currentUser, userModules, onLogout }) {
                                 </div>
                             </div>
                             <div className="space-y-2">{(fixedBudget.expenses || []).map(e=>(
-                                <div key={e.id} className="flex justify-between items-center bg-red-50 p-3 rounded-lg flex-wrap gap-2">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="font-medium">{e.name}</span>
-                                        {e.category&&<span className="text-xs bg-gray-200 px-2 py-0.5 rounded">{e.category}</span>}
-                                        {e.isPercent&&<span className="text-xs bg-yellow-200 px-2 py-0.5 rounded">{e.percentOf}% of income</span>}
-                                        {e.note&&<span className="text-xs text-gray-500 italic">📝 {e.note}</span>}
+                                <div key={e.id} className="bg-red-50 p-3 rounded-lg">
+                                    <div className="flex justify-between items-center flex-wrap gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="font-medium">{e.name}</span>
+                                            {e.category&&<span className="text-xs bg-gray-200 px-2 py-0.5 rounded">{e.category}</span>}
+                                            {e.isPercent&&<span className="text-xs bg-yellow-200 px-2 py-0.5 rounded">{e.percentOf}% of income</span>}
+                                            {e.note&&<span className="text-xs text-gray-500 italic">📝 {e.note}</span>}
+                                        </div>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-gray-500">$</span>
+                                            <input type="number" defaultValue={e.amount||''} onBlur={ev=>{const amt=parseFloat(ev.target.value)||0;setFixedBudget(p=>({...p,expenses:p.expenses.map(x=>x.id===e.id?{...x,amount:amt}:x)}));}} className="w-24 px-2 py-1 border rounded text-sm text-right" placeholder="0"/>
+                                            <select value={e.type} onChange={ev=>setFixedBudget(p=>({...p,expenses:p.expenses.map(x=>x.id===e.id?{...x,type:ev.target.value}:x)}))} className="px-2 py-1 border rounded text-sm bg-white">
+                                                <option value="weekly">Weekly</option>
+                                                <option value="biweekly">Bi-Weekly</option>
+                                                <option value="semimonthly">Semi-Monthly</option>
+                                                <option value="monthly">Monthly</option>
+                                                <option value="quarterly">Quarterly</option>
+                                                <option value="semiannually">Semi-Annually</option>
+                                                <option value="yearly">Yearly</option>
+                                            </select>
+                                            <input defaultValue={e.note||''} onBlur={ev=>setFixedBudget(p=>({...p,expenses:p.expenses.map(x=>x.id===e.id?{...x,note:ev.target.value}:x)}))} className="w-32 px-2 py-1 border rounded text-sm" placeholder="Note"/>
+                                            {e.type!=='monthly'&&e.amount>0&&<span className="text-xs text-gray-500 whitespace-nowrap">≈{formatUSD(toMonthly(e.amount,e.type))}/mo</span>}
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setAutoPopItem(autoPopItem?.id === e.id ? null : {type: 'expense', id: e.id, item: e})}
+                                                className={`px-2 py-1 rounded text-xs font-medium transition-all ${autoPopItem?.id === e.id ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'}`}
+                                                title="Auto-populate to actual"
+                                            >
+                                                🔄
+                                            </button>
+                                            <button onClick={()=>delFE(e.id)} className="text-red-500 ml-1"><Trash/></button>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-gray-500">$</span>
-                                        <input type="number" defaultValue={e.amount||''} onBlur={ev=>{const amt=parseFloat(ev.target.value)||0;setFixedBudget(p=>({...p,expenses:p.expenses.map(x=>x.id===e.id?{...x,amount:amt}:x)}));}} className="w-24 px-2 py-1 border rounded text-sm text-right" placeholder="0"/>
-                                        <select value={e.type} onChange={ev=>setFixedBudget(p=>({...p,expenses:p.expenses.map(x=>x.id===e.id?{...x,type:ev.target.value}:x)}))} className="px-2 py-1 border rounded text-sm bg-white">
-                                            <option value="weekly">Weekly</option>
-                                            <option value="biweekly">Bi-Weekly</option>
-                                            <option value="semimonthly">Semi-Monthly</option>
-                                            <option value="monthly">Monthly</option>
-                                            <option value="quarterly">Quarterly</option>
-                                            <option value="semiannually">Semi-Annually</option>
-                                            <option value="yearly">Yearly</option>
-                                        </select>
-                                        <input defaultValue={e.note||''} onBlur={ev=>setFixedBudget(p=>({...p,expenses:p.expenses.map(x=>x.id===e.id?{...x,note:ev.target.value}:x)}))} className="w-32 px-2 py-1 border rounded text-sm" placeholder="Note"/>
-                                        {e.type!=='monthly'&&e.amount>0&&<span className="text-xs text-gray-500 whitespace-nowrap">≈{formatUSD(toMonthly(e.amount,e.type))}/mo</span>}
-                                        <button onClick={()=>delFE(e.id)} className="text-red-500 ml-1"><Trash/></button>
-                                    </div>
+                                    {/* Auto-populate popup */}
+                                    {autoPopItem?.id === e.id && autoPopItem?.type === 'expense' && (
+                                        <div className="mt-2 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="text-xs text-purple-700 font-medium">Add to actual:</span>
+                                                <input 
+                                                    type="month" 
+                                                    value={autoPopRange.from}
+                                                    onChange={ev => setAutoPopRange(p => ({...p, from: ev.target.value}))}
+                                                    className="px-2 py-1 border rounded text-xs"
+                                                />
+                                                <span className="text-xs text-gray-500">to</span>
+                                                <input 
+                                                    type="month" 
+                                                    value={autoPopRange.to}
+                                                    onChange={ev => setAutoPopRange(p => ({...p, to: ev.target.value}))}
+                                                    className="px-2 py-1 border rounded text-xs"
+                                                />
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => autoPopulateItem(e, 'expense', autoPopRange.from, autoPopRange.to)}
+                                                    className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-xs font-medium"
+                                                >
+                                                    ✓ Add
+                                                </button>
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => setAutoPopItem(null)}
+                                                    className="text-gray-500 hover:text-gray-700 px-2 py-1 text-xs"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ))}</div>
                         </div>
