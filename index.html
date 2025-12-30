@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <meta charset="UTF-8">
+<head>
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WealthWise - Budget &amp; Investment Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -72,6 +72,21 @@ const UserIcon = () => <Icon d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 
 const LogOut = () => <Icon d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" size={16}/>;
 
 const toast = (ok, msg) => { const t = document.getElementById('toast'); t.className = 'toast ' + (ok ? 'ok' : 'err'); t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2500); };
+
+// USD Formatter
+const formatUSD = (num) => {
+    if (num === null || num === undefined || num === '') return '';
+    const n = typeof num === 'string' ? parseFloat(num.replace(/[^0-9.-]/g, '')) : num;
+    if (isNaN(n)) return '';
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
+};
+
+const formatUSD2 = (num) => {
+    if (num === null || num === undefined || num === '') return '';
+    const n = typeof num === 'string' ? parseFloat(num.replace(/[^0-9.-]/g, '')) : num;
+    if (isNaN(n)) return '';
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+};
 
 // Firebase Configuration
 const firebaseConfig = {
@@ -1057,11 +1072,16 @@ function App({ currentUser, userModules, onLogout }) {
         downPaymentPercent: 20,
         interestRate: 7,
         loanTerm: 30,
+        mortgageStartDate: '',
+        mortgageClosingCosts: 0,
         
         // Income
         monthlyRent: 0,
         otherIncome: 0,
         vacancyRate: 8,
+        
+        // Tenant Info (auto-adds to rent)
+        tenants: [],
         
         // Expenses
         propertyTax: 0,
@@ -1323,10 +1343,10 @@ function App({ currentUser, userModules, onLogout }) {
     }, []);
     
     // Form state
-    const [newFI, setNewFI] = useState({ name: '', amount: 0, type: 'monthly' });
-    const [newFE, setNewFE] = useState({ name: '', amount: 0, type: 'monthly', category: '' });
-    const [newAI, setNewAI] = useState({ name: '', amount: 0, date: new Date().toISOString().split('T')[0] });
-    const [newAE, setNewAE] = useState({ name: '', amount: 0, date: new Date().toISOString().split('T')[0], category: '' });
+    const [newFI, setNewFI] = useState({ name: '', amount: 0, type: 'monthly', note: '' });
+    const [newFE, setNewFE] = useState({ name: '', amount: 0, type: 'monthly', category: '', note: '', isPercent: false, percentOf: 0 });
+    const [newAI, setNewAI] = useState({ name: '', amount: 0, date: new Date().toISOString().split('T')[0], note: '' });
+    const [newAE, setNewAE] = useState({ name: '', amount: 0, date: new Date().toISOString().split('T')[0], category: '', note: '' });
     const [newBorrowed, setNewBorrowed] = useState({ lenderName: '', amount: 0, monthlyInterest: 0, startDate: '', notes: '' });
     const [newGenIncome, setNewGenIncome] = useState({ name: '', amount: 0, date: new Date().toISOString().split('T')[0], category: '' });
     const [newTransfer, setNewTransfer] = useState({ fromGeneral: 0, toProperty: '', toCompany: '', date: new Date().toISOString().split('T')[0], notes: '' });
@@ -1583,13 +1603,22 @@ function App({ currentUser, userModules, onLogout }) {
     const deleteTransfer = id => setTransfers(t => t.filter(x => x.id !== id));
 
     // Budget CRUD
-    const addFI = () => { if (newFI.name && newFI.amount > 0) { setFixedBudget(p => ({ ...p, incomes: [...p.incomes, { ...newFI, id: Date.now() }] })); setNewFI({ name: '', amount: 0, type: 'monthly' }); } };
+    const addFI = () => { if (newFI.name && newFI.amount > 0) { setFixedBudget(p => ({ ...p, incomes: [...p.incomes, { ...newFI, id: Date.now() }] })); setNewFI({ name: '', amount: 0, type: 'monthly', note: '' }); } };
     const delFI = id => setFixedBudget(p => ({ ...p, incomes: p.incomes.filter(i => i.id !== id) }));
-    const addFE = () => { if (newFE.name && newFE.amount > 0) { setFixedBudget(p => ({ ...p, expenses: [...p.expenses, { ...newFE, id: Date.now() }] })); setNewFE({ name: '', amount: 0, type: 'monthly', category: '' }); } };
+    const addFE = () => { 
+        if (newFE.name && (newFE.amount > 0 || newFE.isPercent)) { 
+            const expense = { ...newFE, id: Date.now() };
+            if (newFE.isPercent) {
+                expense.amount = (newFE.percentOf / 100) * fixedInc;
+            }
+            setFixedBudget(p => ({ ...p, expenses: [...p.expenses, expense] })); 
+            setNewFE({ name: '', amount: 0, type: 'monthly', category: '', note: '', isPercent: false, percentOf: 0 }); 
+        } 
+    };
     const delFE = id => setFixedBudget(p => ({ ...p, expenses: p.expenses.filter(e => e.id !== id) }));
-    const addAI = () => { if (newAI.name && newAI.amount > 0) { setActualBudget(p => ({ ...p, incomes: [...p.incomes, { ...newAI, id: Date.now() }] })); setNewAI({ name: '', amount: 0, date: new Date().toISOString().split('T')[0] }); } };
+    const addAI = () => { if (newAI.name && newAI.amount > 0) { setActualBudget(p => ({ ...p, incomes: [...p.incomes, { ...newAI, id: Date.now() }] })); setNewAI({ name: '', amount: 0, date: new Date().toISOString().split('T')[0], note: '' }); } };
     const delAI = id => setActualBudget(p => ({ ...p, incomes: p.incomes.filter(i => i.id !== id) }));
-    const addAE = () => { if (newAE.name && newAE.amount > 0) { setActualBudget(p => ({ ...p, expenses: [...p.expenses, { ...newAE, id: Date.now() }] })); setNewAE({ name: '', amount: 0, date: new Date().toISOString().split('T')[0], category: '' }); } };
+    const addAE = () => { if (newAE.name && newAE.amount > 0) { setActualBudget(p => ({ ...p, expenses: [...p.expenses, { ...newAE, id: Date.now() }] })); setNewAE({ name: '', amount: 0, date: new Date().toISOString().split('T')[0], category: '', note: '' }); } };
     const delAE = id => setActualBudget(p => ({ ...p, expenses: p.expenses.filter(e => e.id !== id) }));
 
     if (loading) return <div className="min-h-screen animated-bg flex items-center justify-center"><div className="text-center"><div className="animate-spin rounded-full h-16 w-16 border-4 border-white/30 border-t-white mx-auto mb-4"></div><p className="text-white/80 text-lg">Loading WealthWise...</p></div></div>;
@@ -2233,10 +2262,14 @@ function App({ currentUser, userModules, onLogout }) {
                                             </div>
                                             <div className="bg-white p-4 rounded-lg">
                                                 <h3 className="font-bold text-gray-700 mb-3">🏦 Financing</h3>
-                                                <div className="grid grid-cols-3 gap-3">
+                                                <div className="grid grid-cols-3 gap-3 mb-3">
                                                     <div><label className="text-xs text-gray-500">Down %</label><input type="number" className="w-full px-3 py-2 border rounded-lg" value={analyzer.downPaymentPercent || ''} onChange={e => setAnalyzer({...analyzer, downPaymentPercent: parseFloat(e.target.value) || 0})} /></div>
                                                     <div><label className="text-xs text-gray-500">Rate %</label><input type="number" step="0.1" className="w-full px-3 py-2 border rounded-lg" value={analyzer.interestRate || ''} onChange={e => setAnalyzer({...analyzer, interestRate: parseFloat(e.target.value) || 0})} /></div>
                                                     <div><label className="text-xs text-gray-500">Term (yrs)</label><input type="number" className="w-full px-3 py-2 border rounded-lg" value={analyzer.loanTerm || ''} onChange={e => setAnalyzer({...analyzer, loanTerm: parseInt(e.target.value) || 30})} /></div>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div><label className="text-xs text-gray-500">Mortgage Start Date</label><input type="date" className="w-full px-3 py-2 border rounded-lg" value={analyzer.mortgageStartDate || ''} onChange={e => setAnalyzer({...analyzer, mortgageStartDate: e.target.value})} /></div>
+                                                    <div><label className="text-xs text-gray-500">Mortgage Closing Costs</label><input type="number" className="w-full px-3 py-2 border rounded-lg" value={analyzer.mortgageClosingCosts || ''} onChange={e => setAnalyzer({...analyzer, mortgageClosingCosts: parseFloat(e.target.value) || 0})} placeholder="$0" /></div>
                                                 </div>
                                             </div>
                                             <div className="bg-white p-4 rounded-lg">
@@ -2245,6 +2278,22 @@ function App({ currentUser, userModules, onLogout }) {
                                                     <div><label className="text-xs text-gray-500">Monthly Rent</label><input type="number" className="w-full px-3 py-2 border rounded-lg" value={analyzer.monthlyRent || ''} onChange={e => setAnalyzer({...analyzer, monthlyRent: parseFloat(e.target.value) || 0})} /></div>
                                                     <div><label className="text-xs text-gray-500">Other Income</label><input type="number" className="w-full px-3 py-2 border rounded-lg" value={analyzer.otherIncome || ''} onChange={e => setAnalyzer({...analyzer, otherIncome: parseFloat(e.target.value) || 0})} /></div>
                                                     <div><label className="text-xs text-gray-500">Vacancy %</label><input type="number" className="w-full px-3 py-2 border rounded-lg" value={analyzer.vacancyRate || ''} onChange={e => setAnalyzer({...analyzer, vacancyRate: parseFloat(e.target.value) || 0})} /></div>
+                                                </div>
+                                                {/* Tenant Manager */}
+                                                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                                                    <h4 className="text-sm font-bold text-blue-800 mb-2">👥 Tenants (auto-added to rent)</h4>
+                                                    <div className="space-y-2">
+                                                        {(analyzer.tenants || []).map((t, idx) => (
+                                                            <div key={idx} className="flex items-center gap-2 bg-white p-2 rounded">
+                                                                <input className="flex-1 px-2 py-1 border rounded text-sm" placeholder="Tenant name" value={t.name||''} onChange={e => {const newT=[...(analyzer.tenants||[])];newT[idx]={...newT[idx],name:e.target.value};setAnalyzer({...analyzer,tenants:newT});}} />
+                                                                <span className="text-gray-500">$</span>
+                                                                <input type="number" className="w-24 px-2 py-1 border rounded text-sm" placeholder="Rent" value={t.rent||''} onChange={e => {const newT=[...(analyzer.tenants||[])];newT[idx]={...newT[idx],rent:parseFloat(e.target.value)||0};const totalRent=newT.reduce((s,x)=>s+(x.rent||0),0);setAnalyzer({...analyzer,tenants:newT,monthlyRent:totalRent});}} />
+                                                                <button onClick={() => {const newT=(analyzer.tenants||[]).filter((_,i)=>i!==idx);const totalRent=newT.reduce((s,x)=>s+(x.rent||0),0);setAnalyzer({...analyzer,tenants:newT,monthlyRent:totalRent});}} className="text-red-500"><Trash/></button>
+                                                            </div>
+                                                        ))}
+                                                        <button onClick={() => setAnalyzer({...analyzer, tenants: [...(analyzer.tenants||[]), {name:'',rent:0}]})} className="text-blue-600 text-sm hover:underline">+ Add Tenant</button>
+                                                        {(analyzer.tenants||[]).length > 0 && <p className="text-xs text-blue-600 mt-1">Total from tenants: {formatUSD((analyzer.tenants||[]).reduce((s,t)=>s+(t.rent||0),0))}/mo</p>}
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div className="bg-white p-4 rounded-lg">
@@ -3583,10 +3632,11 @@ function App({ currentUser, userModules, onLogout }) {
 
                         <div className="bg-white rounded-xl shadow p-5">
                             <h3 className="font-bold mb-3">Fixed Income</h3>
-                            <div className="grid grid-cols-4 gap-2 mb-3">
+                            <div className="grid grid-cols-5 gap-2 mb-3">
                                 <input value={newFI.name} onChange={e=>setNewFI(p=>({...p,name:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Name"/>
                                 <input type="number" value={newFI.amount||''} onChange={e=>setNewFI(p=>({...p,amount:parseFloat(e.target.value)||0}))} className="px-3 py-2 border rounded-lg" placeholder="Amount"/>
                                 <select value={newFI.type} onChange={e=>setNewFI(p=>({...p,type:e.target.value}))} className="px-3 py-2 border rounded-lg bg-white"><option value="weekly">Weekly</option><option value="biweekly">Bi-Weekly</option><option value="semimonthly">Semi-Monthly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="semiannually">Semi-Annually</option><option value="yearly">Yearly</option></select>
+                                <input value={newFI.note||''} onChange={e=>setNewFI(p=>({...p,note:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Note (optional)"/>
                                 <button onClick={addFI} className="bg-green-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
                             </div>
                             <div className="space-y-2">{fixedBudget.incomes.map(i=>(
@@ -3594,6 +3644,7 @@ function App({ currentUser, userModules, onLogout }) {
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <span className="font-medium">{i.name}</span>
                                         {i.category&&<span className="text-xs bg-gray-200 px-2 py-0.5 rounded">{i.category}</span>}
+                                        {i.note&&<span className="text-xs text-gray-500 italic">📝 {i.note}</span>}
                                     </div>
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <span className="text-gray-500">$</span>
@@ -3607,7 +3658,8 @@ function App({ currentUser, userModules, onLogout }) {
                                             <option value="semiannually">Semi-Annually</option>
                                             <option value="yearly">Yearly</option>
                                         </select>
-                                        {i.type!=='monthly'&&i.amount>0&&<span className="text-xs text-gray-500 whitespace-nowrap">≈${toMonthly(i.amount,i.type).toLocaleString(undefined,{maximumFractionDigits:0})}/mo</span>}
+                                        <input defaultValue={i.note||''} onBlur={e=>setFixedBudget(p=>({...p,incomes:p.incomes.map(x=>x.id===i.id?{...x,note:e.target.value}:x)}))} className="w-32 px-2 py-1 border rounded text-sm" placeholder="Note"/>
+                                        {i.type!=='monthly'&&i.amount>0&&<span className="text-xs text-gray-500 whitespace-nowrap">≈{formatUSD(toMonthly(i.amount,i.type))}/mo</span>}
                                         <button onClick={()=>delFI(i.id)} className="text-red-500 ml-1"><Trash/></button>
                                     </div>
                                 </div>
@@ -3615,18 +3667,37 @@ function App({ currentUser, userModules, onLogout }) {
                         </div>
                         <div className="bg-white rounded-xl shadow p-5">
                             <h3 className="font-bold mb-3">Fixed Expenses</h3>
-                            <div className="grid grid-cols-5 gap-2 mb-3">
-                                <input value={newFE.name} onChange={e=>setNewFE(p=>({...p,name:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Name"/>
-                                <input type="number" value={newFE.amount||''} onChange={e=>setNewFE(p=>({...p,amount:parseFloat(e.target.value)||0}))} className="px-3 py-2 border rounded-lg" placeholder="Amount"/>
-                                <select value={newFE.type} onChange={e=>setNewFE(p=>({...p,type:e.target.value}))} className="px-3 py-2 border rounded-lg bg-white"><option value="weekly">Weekly</option><option value="biweekly">Bi-Weekly</option><option value="semimonthly">Semi-Monthly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="semiannually">Semi-Annually</option><option value="yearly">Yearly</option></select>
-                                <input value={newFE.category} onChange={e=>setNewFE(p=>({...p,category:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Category"/>
-                                <button onClick={addFE} className="bg-indigo-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
+                            <div className="bg-yellow-50 p-3 rounded-lg mb-3">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <label className="flex items-center gap-2 text-sm">
+                                        <input type="checkbox" checked={newFE.isPercent||false} onChange={e=>setNewFE(p=>({...p,isPercent:e.target.checked,amount:0}))} className="rounded"/>
+                                        <span>% of Income</span>
+                                    </label>
+                                </div>
+                                <div className="grid grid-cols-6 gap-2">
+                                    <input value={newFE.name} onChange={e=>setNewFE(p=>({...p,name:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Name"/>
+                                    {newFE.isPercent ? (
+                                        <div className="flex items-center gap-1">
+                                            <input type="number" value={newFE.percentOf||''} onChange={e=>setNewFE(p=>({...p,percentOf:parseFloat(e.target.value)||0}))} className="px-3 py-2 border rounded-lg w-20" placeholder="%"/>
+                                            <span className="text-gray-500">%</span>
+                                            <span className="text-xs text-gray-500">= {formatUSD((newFE.percentOf/100)*fixedInc)}</span>
+                                        </div>
+                                    ) : (
+                                        <input type="number" value={newFE.amount||''} onChange={e=>setNewFE(p=>({...p,amount:parseFloat(e.target.value)||0}))} className="px-3 py-2 border rounded-lg" placeholder="Amount"/>
+                                    )}
+                                    <select value={newFE.type} onChange={e=>setNewFE(p=>({...p,type:e.target.value}))} className="px-3 py-2 border rounded-lg bg-white"><option value="weekly">Weekly</option><option value="biweekly">Bi-Weekly</option><option value="semimonthly">Semi-Monthly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="semiannually">Semi-Annually</option><option value="yearly">Yearly</option></select>
+                                    <input value={newFE.category} onChange={e=>setNewFE(p=>({...p,category:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Category"/>
+                                    <input value={newFE.note||''} onChange={e=>setNewFE(p=>({...p,note:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Note"/>
+                                    <button onClick={addFE} className="bg-indigo-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
+                                </div>
                             </div>
                             <div className="space-y-2">{fixedBudget.expenses.map(e=>(
                                 <div key={e.id} className="flex justify-between items-center bg-red-50 p-3 rounded-lg flex-wrap gap-2">
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <span className="font-medium">{e.name}</span>
                                         {e.category&&<span className="text-xs bg-gray-200 px-2 py-0.5 rounded">{e.category}</span>}
+                                        {e.isPercent&&<span className="text-xs bg-yellow-200 px-2 py-0.5 rounded">{e.percentOf}% of income</span>}
+                                        {e.note&&<span className="text-xs text-gray-500 italic">📝 {e.note}</span>}
                                     </div>
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <span className="text-gray-500">$</span>
@@ -3640,7 +3711,8 @@ function App({ currentUser, userModules, onLogout }) {
                                             <option value="semiannually">Semi-Annually</option>
                                             <option value="yearly">Yearly</option>
                                         </select>
-                                        {e.type!=='monthly'&&e.amount>0&&<span className="text-xs text-gray-500 whitespace-nowrap">≈${toMonthly(e.amount,e.type).toLocaleString(undefined,{maximumFractionDigits:0})}/mo</span>}
+                                        <input defaultValue={e.note||''} onBlur={ev=>setFixedBudget(p=>({...p,expenses:p.expenses.map(x=>x.id===e.id?{...x,note:ev.target.value}:x)}))} className="w-32 px-2 py-1 border rounded text-sm" placeholder="Note"/>
+                                        {e.type!=='monthly'&&e.amount>0&&<span className="text-xs text-gray-500 whitespace-nowrap">≈{formatUSD(toMonthly(e.amount,e.type))}/mo</span>}
                                         <button onClick={()=>delFE(e.id)} className="text-red-500 ml-1"><Trash/></button>
                                     </div>
                                 </div>
