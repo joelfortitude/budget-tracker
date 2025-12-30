@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="utf-8">
+<head><meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WealthWise - Budget &amp; Investment Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -47,6 +47,49 @@
         .sidebar-link { transition: all 0.2s; border-left: 3px solid transparent; }
         .sidebar-link:hover { background: rgba(255,255,255,0.1); border-left-color: #a78bfa; }
         .sidebar-link.active { background: rgba(255,255,255,0.15); border-left-color: #8b5cf6; }
+        
+        /* Pulse animation for important numbers */
+        @keyframes pulse-green { 0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 50% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } }
+        @keyframes pulse-red { 0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); } 50% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } }
+        .pulse-green { animation: pulse-green 2s infinite; }
+        .pulse-red { animation: pulse-red 2s infinite; }
+        
+        /* Floating animation */
+        @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
+        .float { animation: float 3s ease-in-out infinite; }
+        
+        /* Shimmer effect for loading */
+        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+        .shimmer { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+        
+        /* Glow effects */
+        .glow-green { box-shadow: 0 0 20px rgba(16, 185, 129, 0.3); }
+        .glow-blue { box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+        .glow-purple { box-shadow: 0 0 20px rgba(139, 92, 246, 0.3); }
+        .glow-gold { box-shadow: 0 0 20px rgba(245, 158, 11, 0.3); }
+        
+        /* Progress bar animation */
+        @keyframes progress { from { width: 0%; } }
+        .progress-animate { animation: progress 1s ease-out; }
+        
+        /* Decorative patterns */
+        .pattern-dots { background-image: radial-gradient(circle, #e5e7eb 1px, transparent 1px); background-size: 20px 20px; }
+        .pattern-grid { background-image: linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px); background-size: 20px 20px; }
+        
+        /* Button styles */
+        .btn-primary { background: linear-gradient(135deg, #6366f1, #8b5cf6); transition: all 0.3s; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3); }
+        .btn-success { background: linear-gradient(135deg, #10b981, #059669); transition: all 0.3s; }
+        .btn-success:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3); }
+        .btn-danger { background: linear-gradient(135deg, #ef4444, #dc2626); transition: all 0.3s; }
+        .btn-danger:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(239, 68, 68, 0.3); }
+        
+        /* Number counter animation */
+        @keyframes countUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .count-up { animation: countUp 0.5s ease-out; }
+        
+        /* Ribbon for featured items */
+        .ribbon { position: absolute; top: -5px; right: -5px; background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 5px 15px; font-size: 10px; font-weight: bold; border-radius: 0 8px 0 8px; }
     </style>
 <style type="text/css" nonce="">
 .redacted {
@@ -70,6 +113,122 @@ const Down = () => <Icon d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5
 const Up = () => <Icon d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" size={16}/>;
 const UserIcon = () => <Icon d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8" size={16}/>;
 const LogOut = () => <Icon d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" size={16}/>;
+
+// Decorative SVG Components
+const HouseIcon = ({ size = 48, className = '' }) => (
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" fill="currentColor" fillOpacity="0.1"/>
+        <path d="M9 22V12h6v10"/>
+        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+    </svg>
+);
+
+const ChartIcon = ({ size = 48, className = '' }) => (
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <rect x="3" y="10" width="4" height="10" rx="1" fill="currentColor" fillOpacity="0.2"/>
+        <rect x="10" y="6" width="4" height="14" rx="1" fill="currentColor" fillOpacity="0.3"/>
+        <rect x="17" y="2" width="4" height="18" rx="1" fill="currentColor" fillOpacity="0.4"/>
+    </svg>
+);
+
+const WalletIcon = ({ size = 48, className = '' }) => (
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <rect x="2" y="6" width="20" height="14" rx="2" fill="currentColor" fillOpacity="0.1"/>
+        <path d="M2 10h20"/>
+        <circle cx="17" cy="14" r="2" fill="currentColor" fillOpacity="0.3"/>
+    </svg>
+);
+
+const CoinStack = ({ size = 48, className = '' }) => (
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <ellipse cx="12" cy="5" rx="8" ry="3" fill="currentColor" fillOpacity="0.2"/>
+        <path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/>
+        <ellipse cx="12" cy="11" rx="8" ry="3" fill="currentColor" fillOpacity="0.1"/>
+        <path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/>
+    </svg>
+);
+
+const TrendUp = ({ size = 48, className = '' }) => (
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M23 6l-9.5 9.5-5-5L1 18" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M17 6h6v6" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+);
+
+const PiggyBank = ({ size = 48, className = '' }) => (
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M19 7c0-1.1-.9-2-2-2H9C7.3 5 6 6.3 6 8v6c0 2.2 1.8 4 4 4h4c2.2 0 4-1.8 4-4V7z" fill="currentColor" fillOpacity="0.1"/>
+        <circle cx="15" cy="10" r="1" fill="currentColor"/>
+        <path d="M6 12H4a2 2 0 00-2 2v0a2 2 0 002 2h2"/>
+        <path d="M18 8h2a2 2 0 012 2v1a2 2 0 01-2 2h-1"/>
+        <path d="M9 18v2M15 18v2"/>
+        <path d="M10 5V3"/>
+    </svg>
+);
+
+const BuildingIcon = ({ size = 48, className = '' }) => (
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <rect x="4" y="2" width="16" height="20" rx="2" fill="currentColor" fillOpacity="0.1"/>
+        <path d="M9 22V12h6v10"/>
+        <rect x="7" y="5" width="3" height="3" rx="0.5" fill="currentColor" fillOpacity="0.3"/>
+        <rect x="14" y="5" width="3" height="3" rx="0.5" fill="currentColor" fillOpacity="0.3"/>
+        <rect x="7" y="10" width="3" height="3" rx="0.5" fill="currentColor" fillOpacity="0.3"/>
+        <rect x="14" y="10" width="3" height="3" rx="0.5" fill="currentColor" fillOpacity="0.3"/>
+    </svg>
+);
+
+const KeyIcon = ({ size = 48, className = '' }) => (
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <circle cx="8" cy="15" r="5" fill="currentColor" fillOpacity="0.1"/>
+        <path d="M12.4 10.6L21 2"/>
+        <path d="M18 5l3-1-1 3"/>
+        <circle cx="8" cy="15" r="2"/>
+    </svg>
+);
+
+// Progress Bar Component
+const ProgressBar = ({ value, max, color = 'blue', showLabel = true, label = '' }) => {
+    const percent = max > 0 ? Math.min((value / max) * 100, 100) : 0;
+    const colorClasses = {
+        green: 'bg-gradient-to-r from-green-400 to-emerald-500',
+        red: 'bg-gradient-to-r from-red-400 to-rose-500',
+        blue: 'bg-gradient-to-r from-blue-400 to-indigo-500',
+        purple: 'bg-gradient-to-r from-purple-400 to-violet-500',
+        amber: 'bg-gradient-to-r from-amber-400 to-orange-500'
+    };
+    return (
+        <div className="w-full">
+            {showLabel && <div className="flex justify-between text-xs text-gray-600 mb-1"><span>{label}</span><span>{percent.toFixed(0)}%</span></div>}
+            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className={`h-full ${colorClasses[color]} progress-animate rounded-full`} style={{ width: `${percent}%` }}/>
+            </div>
+        </div>
+    );
+};
+
+// Stat Card with Icon
+const StatCard = ({ icon, label, value, subValue, color = 'blue', trend }) => {
+    const colorClasses = {
+        green: 'from-green-500 to-emerald-600 text-white',
+        red: 'from-red-500 to-rose-600 text-white',
+        blue: 'from-blue-500 to-indigo-600 text-white',
+        purple: 'from-purple-500 to-violet-600 text-white',
+        amber: 'from-amber-500 to-orange-600 text-white'
+    };
+    return (
+        <div className={`bg-gradient-to-br ${colorClasses[color]} rounded-2xl p-5 card-hover relative overflow-hidden`}>
+            <div className="absolute top-0 right-0 opacity-10">{icon}</div>
+            <p className="text-sm opacity-80 mb-1">{label}</p>
+            <p className="text-2xl font-bold count-up">{value}</p>
+            {subValue && <p className="text-xs opacity-70 mt-1">{subValue}</p>}
+            {trend && (
+                <div className={`flex items-center gap-1 mt-2 text-xs ${trend > 0 ? 'text-green-200' : 'text-red-200'}`}>
+                    {trend > 0 ? '↑' : '↓'} {Math.abs(trend)}%
+                </div>
+            )}
+        </div>
+    );
+};
 
 const toast = (ok, msg) => { const t = document.getElementById('toast'); t.className = 'toast ' + (ok ? 'ok' : 'err'); t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2500); };
 
@@ -1455,8 +1614,8 @@ function App({ currentUser, userModules, onLogout }) {
     const fmtMonth = d => d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
     // Budget calcs
-    const fixedInc = fixedBudget.incomes.reduce((s, i) => s + toMonthly(i.amount, i.type), 0);
-    const fixedExp = fixedBudget.expenses.reduce((s, e) => s + toMonthly(e.amount, e.type), 0);
+    const fixedInc = (fixedBudget.incomes || []).reduce((s, i) => s + toMonthly(i.amount, i.type), 0);
+    const fixedExp = (fixedBudget.expenses || []).reduce((s, e) => s + toMonthly(e.amount, e.type), 0);
     const fixedBal = fixedInc - fixedExp;
     const actualInc = byMonth(actualBudget.incomes || [], month).reduce((s, i) => s + i.amount, 0);
     const actualExp = byMonth(actualBudget.expenses || [], month).reduce((s, e) => s + e.amount, 0);
@@ -1615,23 +1774,42 @@ function App({ currentUser, userModules, onLogout }) {
     const deleteTransfer = id => setTransfers(t => t.filter(x => x.id !== id));
 
     // Budget CRUD
-    const addFI = () => { if (newFI.name && newFI.amount > 0) { setFixedBudget(p => ({ ...p, incomes: [...p.incomes, { ...newFI, id: Date.now() }] })); setNewFI({ name: '', amount: 0, type: 'monthly', note: '' }); } };
-    const delFI = id => setFixedBudget(p => ({ ...p, incomes: p.incomes.filter(i => i.id !== id) }));
+    const addFI = () => { if (newFI.name && newFI.amount > 0) { setFixedBudget(p => ({ ...p, incomes: [...(p.incomes || []), { ...newFI, id: Date.now() }] })); setNewFI({ name: '', amount: 0, type: 'monthly', note: '' }); } };
+    const delFI = id => setFixedBudget(p => ({ ...p, incomes: (p.incomes || []).filter(i => i.id !== id) }));
     const addFE = () => { 
         if (newFE.name && (newFE.amount > 0 || newFE.isPercent)) { 
             const expense = { ...newFE, id: Date.now() };
             if (newFE.isPercent) {
                 expense.amount = (newFE.percentOf / 100) * fixedInc;
             }
-            setFixedBudget(p => ({ ...p, expenses: [...p.expenses, expense] })); 
+            setFixedBudget(p => ({ ...p, expenses: [...(p.expenses || []), expense] })); 
             setNewFE({ name: '', amount: 0, type: 'monthly', category: '', note: '', isPercent: false, percentOf: 0 }); 
         } 
     };
-    const delFE = id => setFixedBudget(p => ({ ...p, expenses: p.expenses.filter(e => e.id !== id) }));
+    const delFE = id => setFixedBudget(p => ({ ...p, expenses: (p.expenses || []).filter(e => e.id !== id) }));
     const addAI = () => { if (newAI.name && newAI.amount > 0) { setActualBudget(p => ({ ...p, incomes: [...(p.incomes || []), { ...newAI, id: Date.now() }] })); setNewAI({ name: '', amount: 0, date: new Date().toISOString().split('T')[0], note: '' }); } };
     const delAI = id => setActualBudget(p => ({ ...p, incomes: (p.incomes || []).filter(i => i.id !== id) }));
     const addAE = () => { if (newAE.name && newAE.amount > 0) { setActualBudget(p => ({ ...p, expenses: [...(p.expenses || []), { ...newAE, id: Date.now() }] })); setNewAE({ name: '', amount: 0, date: new Date().toISOString().split('T')[0], category: '', note: '' }); } };
     const delAE = id => setActualBudget(p => ({ ...p, expenses: (p.expenses || []).filter(e => e.id !== id) }));
+
+    // Quick add from budget items to actual
+    const quickAddActualIncome = (name, amount, category) => {
+        const dateStr = month.getFullYear() + '-' + String(month.getMonth() + 1).padStart(2, '0') + '-01';
+        const newItem = { id: Date.now(), name, amount, date: dateStr, category: category || '' };
+        setActualBudget(prev => ({
+            ...prev,
+            incomes: [...(prev.incomes || []), newItem]
+        }));
+    };
+    
+    const quickAddActualExpense = (name, amount, category) => {
+        const dateStr = month.getFullYear() + '-' + String(month.getMonth() + 1).padStart(2, '0') + '-01';
+        const newItem = { id: Date.now(), name, amount, date: dateStr, category: category || '' };
+        setActualBudget(prev => ({
+            ...prev,
+            expenses: [...(prev.expenses || []), newItem]
+        }));
+    };
 
     if (loading) return <div className="min-h-screen animated-bg flex items-center justify-center"><div className="text-center"><div className="animate-spin rounded-full h-16 w-16 border-4 border-white/30 border-t-white mx-auto mb-4"></div><p className="text-white/80 text-lg">Loading WealthWise...</p></div></div>;
 
@@ -3668,7 +3846,7 @@ function App({ currentUser, userModules, onLogout }) {
                                 <input value={newFI.note||''} onChange={e=>setNewFI(p=>({...p,note:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Note (optional)"/>
                                 <button type="button" onClick={addFI} className="bg-green-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
                             </div>
-                            <div className="space-y-2">{fixedBudget.incomes.map(i=>(
+                            <div className="space-y-2">{(fixedBudget.incomes || []).map(i=>(
                                 <div key={i.id} className="flex justify-between items-center bg-green-50 p-3 rounded-lg flex-wrap gap-2">
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <span className="font-medium">{i.name}</span>
@@ -3720,7 +3898,7 @@ function App({ currentUser, userModules, onLogout }) {
                                     <button type="button" onClick={addFE} className="bg-indigo-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
                                 </div>
                             </div>
-                            <div className="space-y-2">{fixedBudget.expenses.map(e=>(
+                            <div className="space-y-2">{(fixedBudget.expenses || []).map(e=>(
                                 <div key={e.id} className="flex justify-between items-center bg-red-50 p-3 rounded-lg flex-wrap gap-2">
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <span className="font-medium">{e.name}</span>
@@ -3788,13 +3966,13 @@ function App({ currentUser, userModules, onLogout }) {
                                 <h3 className="font-bold text-green-800">📋 Expected Income from Budget</h3>
                                 <span className="text-sm text-gray-500">Click to add to this month</span>
                             </div>
-                            {fixedBudget.incomes.length === 0 ? (
+                            {(fixedBudget.incomes || []).length === 0 ? (
                                 <p className="text-gray-500 text-sm">No income items in budget. Add some in the Budget tab.</p>
                             ) : (
                                 <div className="space-y-2">
-                                    {fixedBudget.incomes.map(function(i) {
-                                        var monthlyAmt = toMonthly(i.amount || 0, i.type);
-                                        var isAdded = byMonth(actualBudget.incomes || [], month).some(function(a) { return a.name === i.name; });
+                                    {(fixedBudget.incomes || []).map((i) => {
+                                        const monthlyAmt = toMonthly(i.amount || 0, i.type);
+                                        const isAdded = byMonth(actualBudget.incomes || [], month).some((a) => a.name === i.name);
                                         return (
                                             <div key={i.id} className={'flex justify-between items-center p-3 rounded-lg ' + (isAdded ? 'bg-green-200' : 'bg-white')}>
                                                 <div className="flex items-center gap-2">
@@ -3807,13 +3985,7 @@ function App({ currentUser, userModules, onLogout }) {
                                                     {!isAdded && (
                                                         <button 
                                                             type="button"
-                                                            onClick={function() {
-                                                                var dateStr = month.getFullYear() + '-' + String(month.getMonth() + 1).padStart(2, '0') + '-01';
-                                                                var newItem = { id: Date.now(), name: i.name, amount: monthlyAmt, date: dateStr, category: i.category || '' };
-                                                                setActualBudget(function(prev) {
-                                                                    return {...prev, incomes: (prev.incomes || []).concat([newItem])};
-                                                                });
-                                                            }}
+                                                            onClick={() => quickAddActualIncome(i.name, monthlyAmt, i.category)}
                                                             className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
                                                         >
                                                             Add
@@ -3832,13 +4004,13 @@ function App({ currentUser, userModules, onLogout }) {
                                 <h3 className="font-bold text-red-800">📋 Expected Expenses from Budget</h3>
                                 <span className="text-sm text-gray-500">Click to add to this month</span>
                             </div>
-                            {fixedBudget.expenses.length === 0 ? (
+                            {(fixedBudget.expenses || []).length === 0 ? (
                                 <p className="text-gray-500 text-sm">No expense items in budget. Add some in the Budget tab.</p>
                             ) : (
                                 <div className="space-y-2">
-                                    {fixedBudget.expenses.map(function(e) {
-                                        var monthlyAmt = toMonthly(e.amount || 0, e.type);
-                                        var isAdded = byMonth(actualBudget.expenses || [], month).some(function(a) { return a.name === e.name; });
+                                    {(fixedBudget.expenses || []).map((e) => {
+                                        const monthlyAmt = toMonthly(e.amount || 0, e.type);
+                                        const isAdded = byMonth(actualBudget.expenses || [], month).some((a) => a.name === e.name);
                                         return (
                                             <div key={e.id} className={'flex justify-between items-center p-3 rounded-lg ' + (isAdded ? 'bg-red-200' : 'bg-white')}>
                                                 <div className="flex items-center gap-2">
@@ -3851,13 +4023,7 @@ function App({ currentUser, userModules, onLogout }) {
                                                     {!isAdded && (
                                                         <button 
                                                             type="button"
-                                                            onClick={function() {
-                                                                var dateStr = month.getFullYear() + '-' + String(month.getMonth() + 1).padStart(2, '0') + '-01';
-                                                                var newItem = { id: Date.now(), name: e.name, amount: monthlyAmt, date: dateStr, category: e.category || '' };
-                                                                setActualBudget(function(prev) {
-                                                                    return {...prev, expenses: (prev.expenses || []).concat([newItem])};
-                                                                });
-                                                            }}
+                                                            onClick={() => quickAddActualExpense(e.name, monthlyAmt, e.category)}
                                                             className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
                                                         >
                                                             Add
