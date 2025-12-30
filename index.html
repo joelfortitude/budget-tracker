@@ -232,6 +232,106 @@ const StatCard = ({ icon, label, value, subValue, color = 'blue', trend }) => {
 
 const toast = (ok, msg) => { const t = document.getElementById('toast'); t.className = 'toast ' + (ok ? 'ok' : 'err'); t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2500); };
 
+// Wisdom Quotes
+const budgetQuotes = [
+    { quote: "A budget is telling your money where to go instead of wondering where it went.", author: "Dave Ramsey" },
+    { quote: "The goal isn't more money. The goal is living life on your terms.", author: "Chris Brogan" },
+    { quote: "Beware of little expenses; a small leak will sink a great ship.", author: "Benjamin Franklin" },
+    { quote: "It's not your salary that makes you rich, it's your spending habits.", author: "Charles A. Jaffe" },
+    { quote: "A penny saved is a penny earned.", author: "Benjamin Franklin" },
+    { quote: "Don't tell me where your priorities are. Show me where you spend your money and I'll tell you what they are.", author: "James W. Frick" },
+    { quote: "The habit of saving is itself an education; it fosters every virtue, teaches self-denial, cultivates the sense of order.", author: "T.T. Munger" },
+    { quote: "Financial peace isn't the acquisition of stuff. It's learning to live on less than you make.", author: "Dave Ramsey" },
+    { quote: "You must gain control over your money or the lack of it will forever control you.", author: "Dave Ramsey" },
+    { quote: "The art is not in making money, but in keeping it.", author: "Proverb" },
+    { quote: "Never spend your money before you have earned it.", author: "Thomas Jefferson" },
+    { quote: "Too many people spend money they haven't earned to buy things they don't want to impress people they don't like.", author: "Will Rogers" },
+];
+
+const investmentQuotes = [
+    { quote: "The stock market is filled with individuals who know the price of everything, but the value of nothing.", author: "Warren Buffett" },
+    { quote: "Rule No. 1: Never lose money. Rule No. 2: Never forget Rule No. 1.", author: "Warren Buffett" },
+    { quote: "Price is what you pay. Value is what you get.", author: "Warren Buffett" },
+    { quote: "Be fearful when others are greedy and greedy when others are fearful.", author: "Warren Buffett" },
+    { quote: "The best investment you can make is in yourself.", author: "Warren Buffett" },
+    { quote: "Risk comes from not knowing what you're doing.", author: "Warren Buffett" },
+    { quote: "It's far better to buy a wonderful company at a fair price than a fair company at a wonderful price.", author: "Warren Buffett" },
+    { quote: "In the short run, the market is a voting machine but in the long run, it is a weighing machine.", author: "Benjamin Graham" },
+    { quote: "The individual investor should act consistently as an investor and not as a speculator.", author: "Benjamin Graham" },
+    { quote: "The four most dangerous words in investing are: 'This time it's different.'", author: "Sir John Templeton" },
+    { quote: "Know what you own, and know why you own it.", author: "Peter Lynch" },
+    { quote: "How many millionaires do you know who have become wealthy by investing in savings accounts?", author: "Robert G. Allen" },
+];
+
+const realEstateQuotes = [
+    { quote: "Real estate cannot be lost or stolen, nor can it be carried away. Purchased with common sense, paid for in full, and managed with reasonable care, it is about the safest investment in the world.", author: "Franklin D. Roosevelt" },
+    { quote: "Landlords grow rich in their sleep without working, risking or economizing.", author: "John Stuart Mill" },
+    { quote: "Don't wait to buy real estate. Buy real estate and wait.", author: "Will Rogers" },
+    { quote: "The best investment on Earth is earth.", author: "Louis Glickman" },
+    { quote: "Real estate is an imperishable asset, ever increasing in value.", author: "Russell Sage" },
+    { quote: "Buy land, they're not making it anymore.", author: "Mark Twain" },
+    { quote: "In real estate, you make 10% of your money because you're a genius and 90% because you catch a great wave.", author: "Jeff Greene" },
+    { quote: "Ninety percent of all millionaires become so through owning real estate.", author: "Andrew Carnegie" },
+];
+
+// Random Quote Component
+const WisdomQuote = ({ type = 'budget' }) => {
+    const quotes = type === 'budget' ? budgetQuotes : type === 'investment' ? investmentQuotes : realEstateQuotes;
+    const [currentQuote, setCurrentQuote] = React.useState(() => quotes[Math.floor(Math.random() * quotes.length)]);
+    
+    const nextQuote = () => {
+        const newQuote = quotes[Math.floor(Math.random() * quotes.length)];
+        setCurrentQuote(newQuote);
+    };
+    
+    const bgColors = {
+        budget: 'from-emerald-500/10 to-green-500/10 border-emerald-200',
+        investment: 'from-violet-500/10 to-purple-500/10 border-violet-200',
+        realEstate: 'from-amber-500/10 to-orange-500/10 border-amber-200'
+    };
+    
+    const iconColors = {
+        budget: 'text-emerald-600',
+        investment: 'text-violet-600',
+        realEstate: 'text-amber-600'
+    };
+    
+    return (
+        <div className={`bg-gradient-to-r ${bgColors[type]} border rounded-xl p-4 relative overflow-hidden`}>
+            <div className="absolute top-2 right-2 opacity-10 text-6xl">💡</div>
+            <div className="flex items-start gap-3">
+                <span className={`text-2xl ${iconColors[type]}`}>💬</span>
+                <div className="flex-1">
+                    <p className="text-gray-700 italic text-sm leading-relaxed">"{currentQuote.quote}"</p>
+                    <p className="text-gray-500 text-xs mt-2 font-semibold">— {currentQuote.author}</p>
+                </div>
+                <button onClick={nextQuote} className="text-gray-400 hover:text-gray-600 text-xs">↻ New</button>
+            </div>
+        </div>
+    );
+};
+
+// Decorative Background Pattern Component
+const DecorativePattern = ({ type = 'dots' }) => {
+    if (type === 'circles') {
+        return (
+            <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-5">
+                <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full border-8 border-current"></div>
+                <div className="absolute -bottom-10 -left-10 w-40 h-40 rounded-full border-4 border-current"></div>
+                <div className="absolute top-1/2 right-10 w-20 h-20 rounded-full bg-current"></div>
+            </div>
+        );
+    }
+    if (type === 'waves') {
+        return (
+            <svg className="absolute bottom-0 left-0 w-full opacity-5" viewBox="0 0 1440 120" preserveAspectRatio="none">
+                <path fill="currentColor" d="M0,64L48,69.3C96,75,192,85,288,80C384,75,480,53,576,48C672,43,768,53,864,69.3C960,85,1056,107,1152,101.3C1248,96,1344,64,1392,48L1440,32L1440,120L1392,120C1344,120,1248,120,1152,120C1056,120,960,120,864,120C768,120,672,120,576,120C480,120,384,120,288,120C192,120,96,120,48,120L0,120Z"/>
+            </svg>
+        );
+    }
+    return null;
+};
+
 // USD Formatter
 const formatUSD = (num) => {
     if (num === null || num === undefined || num === '') return '';
@@ -1868,19 +1968,24 @@ function App({ currentUser, userModules, onLogout }) {
                 {/* Investments Landing Page */}
                 {view === 'investments' && (
                     <div className="space-y-6">
+                        {/* Wisdom Quote */}
+                        <WisdomQuote type="investment" />
+                        
                         <h2 className="text-2xl font-bold text-gray-800">📈 Investment Center</h2>
                         <div className="grid md:grid-cols-3 gap-6">
                             {modules.investment && (
                                 <>
-                                    <div onClick={() => setView('money')} className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl shadow-xl p-6 text-white cursor-pointer card-hover">
-                                        <div className="text-4xl mb-4">💰</div>
+                                    <div onClick={() => setView('money')} className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl shadow-xl p-6 text-white cursor-pointer card-hover relative overflow-hidden">
+                                        <DecorativePattern type="circles" />
+                                        <div className="text-4xl mb-4 float">💰</div>
                                         <h3 className="text-xl font-bold mb-2">Borrowed & Lent Money</h3>
                                         <p className="text-white/80 text-sm mb-4">Track money you've borrowed or lent, with interest calculations</p>
                                         <p className="text-2xl font-bold">{formatUSD(totalBorrowed)}</p>
                                         <p className="text-sm text-white/70">Currently borrowed</p>
                                     </div>
-                                    <div onClick={() => setView('investment')} className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-xl p-6 text-white cursor-pointer card-hover">
-                                        <div className="text-4xl mb-4">🏢</div>
+                                    <div onClick={() => setView('investment')} className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-xl p-6 text-white cursor-pointer card-hover relative overflow-hidden">
+                                        <DecorativePattern type="circles" />
+                                        <div className="text-4xl mb-4 float">🏢</div>
                                         <h3 className="text-xl font-bold mb-2">Business Investments</h3>
                                         <p className="text-white/80 text-sm mb-4">Analyze "boring businesses" with SDE calculations</p>
                                         <p className="text-2xl font-bold">{formatUSD(totalInvValue)}</p>
@@ -1889,8 +1994,9 @@ function App({ currentUser, userModules, onLogout }) {
                                 </>
                             )}
                             {modules.realEstate && (
-                                <div onClick={() => setView('realEstate')} className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl shadow-xl p-6 text-white cursor-pointer card-hover">
-                                    <div className="text-4xl mb-4">🏘️</div>
+                                <div onClick={() => setView('realEstate')} className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl shadow-xl p-6 text-white cursor-pointer card-hover relative overflow-hidden">
+                                    <DecorativePattern type="circles" />
+                                    <div className="text-4xl mb-4 float">🏘️</div>
                                     <h3 className="text-xl font-bold mb-2">Real Estate</h3>
                                     <p className="text-white/80 text-sm mb-4">Manage properties and analyze new deals</p>
                                     <p className="text-2xl font-bold">{realEstate.length} Properties</p>
@@ -2021,12 +2127,15 @@ function App({ currentUser, userModules, onLogout }) {
                 {/* Real Estate Module */}
                 {view === 'realEstate' && modules.realEstate && (
                     <div className="space-y-6">
+                        {/* Wisdom Quote */}
+                        <WisdomQuote type="realEstate" />
+                        
                         {/* RE Summary Cards */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-purple-500"><p className="text-xs text-gray-500">Total Properties</p><p className="text-xl font-bold">{realEstate.length}</p></div>
-                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-blue-500"><p className="text-xs text-gray-500">Total Equity</p><p className="text-xl font-bold text-blue-600">{formatUSD(totalEquity)}</p></div>
-                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-green-500"><p className="text-xs text-gray-500">Monthly Cash Flow</p><p className={`text-xl font-bold ${totalCashFlow>=0?'text-green-600':'text-red-600'}`}>{formatUSD(totalCashFlow)}</p></div>
-                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-orange-500"><p className="text-xs text-gray-500">Annual Cash Flow</p><p className={`text-xl font-bold ${totalCashFlow>=0?'text-green-600':'text-red-600'}`}>{formatUSD(totalCashFlow*12)}</p></div>
+                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-purple-500 card-hover"><p className="text-xs text-gray-500">Total Properties</p><p className="text-xl font-bold">{realEstate.length}</p></div>
+                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-blue-500 card-hover glow-blue"><p className="text-xs text-gray-500">Total Equity</p><p className="text-xl font-bold text-blue-600">{formatUSD(totalEquity)}</p></div>
+                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-green-500 card-hover glow-green"><p className="text-xs text-gray-500">Monthly Cash Flow</p><p className={`text-xl font-bold ${totalCashFlow>=0?'text-green-600':'text-red-600'}`}>{formatUSD(totalCashFlow)}</p></div>
+                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-orange-500 card-hover glow-gold"><p className="text-xs text-gray-500">Annual Cash Flow</p><p className={`text-xl font-bold ${totalCashFlow>=0?'text-green-600':'text-red-600'}`}>{formatUSD(totalCashFlow*12)}</p></div>
                         </div>
                         
                         {/* Property Analyzer Toggle */}
@@ -3589,6 +3698,93 @@ function App({ currentUser, userModules, onLogout }) {
                 {/* Budget View */}
                 {view === 'budget' && modules.budget && (
                     <div className="space-y-6">
+                        {/* Wisdom Quote */}
+                        <WisdomQuote type="budget" />
+                        
+                        {/* Auto-Populate to Actual */}
+                        <div className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl shadow p-5 border border-purple-200">
+                            <div className="flex items-center gap-3 mb-3">
+                                <span className="text-2xl">🔄</span>
+                                <div>
+                                    <h3 className="font-bold text-purple-800">Auto-Populate Budget to Actual Spending</h3>
+                                    <p className="text-sm text-gray-600">Copy your budget items to actual spending for selected months</p>
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap items-end gap-4">
+                                <div>
+                                    <label className="text-xs text-gray-500 block mb-1">From Month</label>
+                                    <input type="month" id="autoPopFrom" defaultValue={new Date().toISOString().slice(0,7)} className="px-3 py-2 border rounded-lg"/>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-500 block mb-1">To Month</label>
+                                    <input type="month" id="autoPopTo" defaultValue={new Date().toISOString().slice(0,7)} className="px-3 py-2 border rounded-lg"/>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <label className="flex items-center gap-2 text-sm">
+                                        <input type="checkbox" id="autoPopIncome" defaultChecked className="rounded"/> Income
+                                    </label>
+                                    <label className="flex items-center gap-2 text-sm">
+                                        <input type="checkbox" id="autoPopExpense" defaultChecked className="rounded"/> Expenses
+                                    </label>
+                                </div>
+                                <button 
+                                    type="button"
+                                    onClick={() => {
+                                        const fromMonth = document.getElementById('autoPopFrom').value;
+                                        const toMonth = document.getElementById('autoPopTo').value;
+                                        const includeIncome = document.getElementById('autoPopIncome').checked;
+                                        const includeExpense = document.getElementById('autoPopExpense').checked;
+                                        
+                                        if (!fromMonth || !toMonth) { toast(false, 'Select months'); return; }
+                                        
+                                        const from = new Date(fromMonth + '-01');
+                                        const to = new Date(toMonth + '-01');
+                                        
+                                        if (from > to) { toast(false, 'From month must be before To month'); return; }
+                                        
+                                        let newIncomes = [...(actualBudget.incomes || [])];
+                                        let newExpenses = [...(actualBudget.expenses || [])];
+                                        let addedCount = 0;
+                                        
+                                        const current = new Date(from);
+                                        while (current <= to) {
+                                            const dateStr = current.getFullYear() + '-' + String(current.getMonth() + 1).padStart(2, '0') + '-01';
+                                            
+                                            if (includeIncome) {
+                                                (fixedBudget.incomes || []).forEach(i => {
+                                                    const monthlyAmt = toMonthly(i.amount || 0, i.type);
+                                                    const exists = newIncomes.some(a => a.name === i.name && a.date.startsWith(dateStr.slice(0,7)));
+                                                    if (!exists && monthlyAmt > 0) {
+                                                        newIncomes.push({ id: Date.now() + Math.random(), name: i.name, amount: monthlyAmt, date: dateStr, category: i.category || '' });
+                                                        addedCount++;
+                                                    }
+                                                });
+                                            }
+                                            
+                                            if (includeExpense) {
+                                                (fixedBudget.expenses || []).forEach(e => {
+                                                    const monthlyAmt = toMonthly(e.amount || 0, e.type);
+                                                    const exists = newExpenses.some(a => a.name === e.name && a.date.startsWith(dateStr.slice(0,7)));
+                                                    if (!exists && monthlyAmt > 0) {
+                                                        newExpenses.push({ id: Date.now() + Math.random(), name: e.name, amount: monthlyAmt, date: dateStr, category: e.category || '' });
+                                                        addedCount++;
+                                                    }
+                                                });
+                                            }
+                                            
+                                            current.setMonth(current.getMonth() + 1);
+                                        }
+                                        
+                                        setActualBudget({ incomes: newIncomes, expenses: newExpenses });
+                                        toast(true, `Added ${addedCount} items to Actual Spending!`);
+                                    }}
+                                    className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-semibold transition-all"
+                                >
+                                    🚀 Populate
+                                </button>
+                            </div>
+                        </div>
+                        
                         <div className="grid grid-cols-2 gap-4">
                             <div className="bg-white rounded-xl shadow p-4"><h3 className="font-bold mb-2">Monthly</h3><div className="flex justify-between"><span>Income:</span><span className="font-bold text-green-600">{formatUSD(fixedInc)}</span></div><div className="flex justify-between"><span>Expenses:</span><span className="font-bold text-red-600">{formatUSD(fixedExp)}</span></div><div className="flex justify-between pt-2 border-t mt-2"><span className="font-semibold">Balance:</span><span className={`font-bold text-lg ${fixedBal>=0?'text-blue-600':'text-orange-600'}`}>{formatUSD(fixedBal)}</span></div></div>
                             <div className="bg-white rounded-xl shadow p-4"><h3 className="font-bold mb-2">Annual</h3><div className="flex justify-between"><span>Income:</span><span className="font-bold text-green-600">{formatUSD(fixedInc*12)}</span></div><div className="flex justify-between"><span>Expenses:</span><span className="font-bold text-red-600">{formatUSD(fixedExp*12)}</span></div><div className="flex justify-between pt-2 border-t mt-2"><span className="font-semibold">Balance:</span><span className={`font-bold text-lg ${fixedBal>=0?'text-blue-600':'text-orange-600'}`}>{formatUSD(fixedBal*12)}</span></div></div>
@@ -3931,6 +4127,9 @@ function App({ currentUser, userModules, onLogout }) {
                 {/* Actual Tracking */}
                 {view === 'actual' && modules.budget && (
                     <div className="space-y-6">
+                        {/* Wisdom Quote */}
+                        <WisdomQuote type="budget" />
+                        
                         <div className="bg-white rounded-xl shadow p-4 flex items-center justify-between">
                             <button onClick={()=>changeMonth(-1)} className="p-2 hover:bg-gray-100 rounded-lg"><Left/></button>
                             <h2 className="text-xl font-bold">{fmtMonth(month)}</h2>
@@ -3939,56 +4138,58 @@ function App({ currentUser, userModules, onLogout }) {
                         
                         {/* Summary Cards */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="bg-green-50 rounded-lg p-4 border-l-4 border-green-500">
+                            <div className="bg-green-50 rounded-lg p-4 border-l-4 border-green-500 card-hover">
                                 <p className="text-xs text-gray-600">Actual Income</p>
-                                <p className="text-xl font-bold text-green-700">${actualInc.toLocaleString()}</p>
+                                <p className="text-xl font-bold text-green-700">{formatUSD(actualInc)}</p>
                                 <p className="text-xs text-gray-500">Budget: {formatUSD(fixedInc)}</p>
+                                <ProgressBar value={actualInc} max={fixedInc} color="green" showLabel={false} />
                             </div>
-                            <div className="bg-red-50 rounded-lg p-4 border-l-4 border-red-500">
+                            <div className="bg-red-50 rounded-lg p-4 border-l-4 border-red-500 card-hover">
                                 <p className="text-xs text-gray-600">Actual Expenses</p>
-                                <p className="text-xl font-bold text-red-700">${actualExp.toLocaleString()}</p>
+                                <p className="text-xl font-bold text-red-700">{formatUSD(actualExp)}</p>
                                 <p className="text-xs text-gray-500">Budget: {formatUSD(fixedExp)}</p>
+                                <ProgressBar value={actualExp} max={fixedExp} color="red" showLabel={false} />
                             </div>
-                            <div className={`rounded-lg p-4 border-l-4 ${actualBal>=0?'bg-blue-50 border-blue-500':'bg-orange-50 border-orange-500'}`}>
+                            <div className={`rounded-lg p-4 border-l-4 card-hover ${actualBal>=0?'bg-blue-50 border-blue-500':'bg-orange-50 border-orange-500'}`}>
                                 <p className="text-xs text-gray-600">Balance</p>
-                                <p className={`text-xl font-bold ${actualBal>=0?'text-blue-700':'text-orange-700'}`}>${actualBal.toLocaleString()}</p>
+                                <p className={`text-xl font-bold ${actualBal>=0?'text-blue-700':'text-orange-700'}`}>{formatUSD(actualBal)}</p>
                                 <p className="text-xs text-gray-500">Budget: {formatUSD(fixedBal)}</p>
                             </div>
-                            <div className={`rounded-lg p-4 border-l-4 ${(actualBal-fixedBal)>=0?'bg-green-50 border-green-500':'bg-red-50 border-red-500'}`}>
+                            <div className={`rounded-lg p-4 border-l-4 card-hover ${(actualBal-fixedBal)>=0?'bg-green-50 border-green-500':'bg-red-50 border-red-500'}`}>
                                 <p className="text-xs text-gray-600">vs Budget</p>
-                                <p className={`text-xl font-bold ${(actualBal-fixedBal)>=0?'text-green-700':'text-red-700'}`}>{(actualBal-fixedBal)>=0?'+':''}${(actualBal-fixedBal).toLocaleString(undefined,{maximumFractionDigits:0})}</p>
+                                <p className={`text-xl font-bold ${(actualBal-fixedBal)>=0?'text-green-700':'text-red-700'}`}>{(actualBal-fixedBal)>=0?'+':''}{formatUSD(actualBal-fixedBal)}</p>
                             </div>
                         </div>
 
-                        {/* Budget Items to Track */}
-                        <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl shadow p-5 border border-green-200">
-                            <div className="flex justify-between items-center mb-3">
-                                <h3 className="font-bold text-green-800">📋 Expected Income from Budget</h3>
-                                <span className="text-sm text-gray-500">Click to add to this month</span>
-                            </div>
-                            {(fixedBudget.incomes || []).length === 0 ? (
-                                <p className="text-gray-500 text-sm">No income items in budget. Add some in the Budget tab.</p>
-                            ) : (
+                        {/* Budget Items to Add */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Income to Add */}
+                            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl shadow p-5 border border-green-200">
+                                <div className="flex justify-between items-center mb-3">
+                                    <h3 className="font-bold text-green-800">📋 Budget Income</h3>
+                                    <span className="text-xs text-gray-500">Click to add to {fmtMonth(month)}</span>
+                                </div>
                                 <div className="space-y-2">
-                                    {(fixedBudget.incomes || []).map((i) => {
+                                    {(fixedBudget.incomes || []).length === 0 ? (
+                                        <p className="text-gray-500 text-sm">No income items in budget.</p>
+                                    ) : (fixedBudget.incomes || []).map((i) => {
                                         const monthlyAmt = toMonthly(i.amount || 0, i.type);
                                         const isAdded = byMonth(actualBudget.incomes || [], month).some((a) => a.name === i.name);
                                         return (
-                                            <div key={i.id} className={'flex justify-between items-center p-3 rounded-lg ' + (isAdded ? 'bg-green-200' : 'bg-white')}>
+                                            <div key={i.id} className={'flex justify-between items-center p-3 rounded-lg transition-all ' + (isAdded ? 'bg-green-200' : 'bg-white hover:bg-green-50 border border-green-200')}>
                                                 <div className="flex items-center gap-2">
-                                                    {isAdded && <span className="text-green-600">✓</span>}
-                                                    <span className={isAdded ? 'line-through text-gray-500' : ''}>{i.name}</span>
-                                                    {i.category && <span className="text-xs bg-gray-200 px-2 py-0.5 rounded">{i.category}</span>}
+                                                    {isAdded ? <span className="text-green-600 text-lg">✓</span> : <span className="text-gray-300 text-lg">○</span>}
+                                                    <span className={isAdded ? 'text-green-800' : 'text-gray-700'}>{i.name}</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-bold">{formatUSD(monthlyAmt)}</span>
+                                                    <span className={`font-bold ${isAdded ? 'text-green-700' : 'text-gray-600'}`}>{formatUSD(monthlyAmt)}</span>
                                                     {!isAdded && (
                                                         <button 
                                                             type="button"
                                                             onClick={() => quickAddActualIncome(i.name, monthlyAmt, i.category)}
-                                                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
+                                                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm font-medium transition-all hover:scale-105"
                                                         >
-                                                            Add
+                                                            + Add
                                                         </button>
                                                     )}
                                                 </div>
@@ -3996,37 +4197,35 @@ function App({ currentUser, userModules, onLogout }) {
                                         );
                                     })}
                                 </div>
-                            )}
-                        </div>
-
-                        <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-xl shadow p-5 border border-red-200">
-                            <div className="flex justify-between items-center mb-3">
-                                <h3 className="font-bold text-red-800">📋 Expected Expenses from Budget</h3>
-                                <span className="text-sm text-gray-500">Click to add to this month</span>
                             </div>
-                            {(fixedBudget.expenses || []).length === 0 ? (
-                                <p className="text-gray-500 text-sm">No expense items in budget. Add some in the Budget tab.</p>
-                            ) : (
-                                <div className="space-y-2">
-                                    {(fixedBudget.expenses || []).map((e) => {
+                            
+                            {/* Expenses to Add */}
+                            <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-xl shadow p-5 border border-red-200">
+                                <div className="flex justify-between items-center mb-3">
+                                    <h3 className="font-bold text-red-800">📋 Budget Expenses</h3>
+                                    <span className="text-xs text-gray-500">Click to add to {fmtMonth(month)}</span>
+                                </div>
+                                <div className="space-y-2 max-h-96 overflow-y-auto">
+                                    {(fixedBudget.expenses || []).length === 0 ? (
+                                        <p className="text-gray-500 text-sm">No expense items in budget.</p>
+                                    ) : (fixedBudget.expenses || []).map((e) => {
                                         const monthlyAmt = toMonthly(e.amount || 0, e.type);
                                         const isAdded = byMonth(actualBudget.expenses || [], month).some((a) => a.name === e.name);
                                         return (
-                                            <div key={e.id} className={'flex justify-between items-center p-3 rounded-lg ' + (isAdded ? 'bg-red-200' : 'bg-white')}>
+                                            <div key={e.id} className={'flex justify-between items-center p-3 rounded-lg transition-all ' + (isAdded ? 'bg-red-200' : 'bg-white hover:bg-red-50 border border-red-200')}>
                                                 <div className="flex items-center gap-2">
-                                                    {isAdded && <span className="text-red-600">✓</span>}
-                                                    <span className={isAdded ? 'line-through text-gray-500' : ''}>{e.name}</span>
-                                                    {e.category && <span className="text-xs bg-gray-200 px-2 py-0.5 rounded">{e.category}</span>}
+                                                    {isAdded ? <span className="text-red-600 text-lg">✓</span> : <span className="text-gray-300 text-lg">○</span>}
+                                                    <span className={isAdded ? 'text-red-800' : 'text-gray-700'}>{e.name}</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-bold">{formatUSD(monthlyAmt)}</span>
+                                                    <span className={`font-bold ${isAdded ? 'text-red-700' : 'text-gray-600'}`}>{formatUSD(monthlyAmt)}</span>
                                                     {!isAdded && (
                                                         <button 
                                                             type="button"
                                                             onClick={() => quickAddActualExpense(e.name, monthlyAmt, e.category)}
-                                                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
+                                                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm font-medium transition-all hover:scale-105"
                                                         >
-                                                            Add
+                                                            + Add
                                                         </button>
                                                     )}
                                                 </div>
@@ -4034,18 +4233,12 @@ function App({ currentUser, userModules, onLogout }) {
                                         );
                                     })}
                                 </div>
-                            )}
+                            </div>
                         </div>
 
                         {/* Actual Income This Month */}
                         <div className="bg-white rounded-xl shadow p-5">
                             <h3 className="font-bold mb-3">✅ Actual Income This Month</h3>
-                            <div className="grid grid-cols-4 gap-2 mb-3">
-                                <input value={newAI.name} onChange={e=>setNewAI(p=>({...p,name:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Name"/>
-                                <input type="number" value={newAI.amount||''} onChange={e=>setNewAI(p=>({...p,amount:parseFloat(e.target.value)||0}))} className="px-3 py-2 border rounded-lg" placeholder="Amount"/>
-                                <input type="date" value={newAI.date} onChange={e=>setNewAI(p=>({...p,date:e.target.value}))} className="px-3 py-2 border rounded-lg"/>
-                                <button type="button" onClick={addAI} className="bg-green-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
-                            </div>
                             <div className="space-y-2">
                                 {byMonth(actualBudget.incomes || [],month).map(i=>(
                                     <div key={i.id} className="flex justify-between items-center bg-green-50 p-3 rounded-lg">
@@ -4055,14 +4248,8 @@ function App({ currentUser, userModules, onLogout }) {
                                             {i.category&&<span className="text-xs bg-gray-200 px-2 py-0.5 rounded">{i.category}</span>}
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <span className="text-gray-500">$</span>
-                                            <input 
-                                                type="number" 
-                                                defaultValue={i.amount} 
-                                                onBlur={e=>{const amt=parseFloat(e.target.value)||0;setActualBudget(p=>({...p,incomes:p.incomes.map(x=>x.id===i.id?{...x,amount:amt}:x)}));}}
-                                                className="w-24 px-2 py-1 border rounded text-sm text-right"
-                                            />
-                                            <button onClick={()=>delAI(i.id)} className="text-red-500"><Trash/></button>
+                                            <span className="font-bold text-green-700">{formatUSD(i.amount)}</span>
+                                            <button type="button" onClick={()=>delAI(i.id)} className="text-red-500 hover:text-red-700"><Trash/></button>
                                         </div>
                                     </div>
                                 ))}
@@ -4073,13 +4260,6 @@ function App({ currentUser, userModules, onLogout }) {
                         {/* Actual Expenses This Month */}
                         <div className="bg-white rounded-xl shadow p-5">
                             <h3 className="font-bold mb-3">✅ Actual Expenses This Month</h3>
-                            <div className="grid grid-cols-5 gap-2 mb-3">
-                                <input value={newAE.name} onChange={e=>setNewAE(p=>({...p,name:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Name"/>
-                                <input type="number" value={newAE.amount||''} onChange={e=>setNewAE(p=>({...p,amount:parseFloat(e.target.value)||0}))} className="px-3 py-2 border rounded-lg" placeholder="Amount"/>
-                                <input type="date" value={newAE.date} onChange={e=>setNewAE(p=>({...p,date:e.target.value}))} className="px-3 py-2 border rounded-lg"/>
-                                <input value={newAE.category} onChange={e=>setNewAE(p=>({...p,category:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Category"/>
-                                <button type="button" onClick={addAE} className="bg-indigo-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
-                            </div>
                             <div className="space-y-2">
                                 {byMonth(actualBudget.expenses || [],month).map(e=>(
                                     <div key={e.id} className="flex justify-between items-center bg-red-50 p-3 rounded-lg">
@@ -4089,14 +4269,8 @@ function App({ currentUser, userModules, onLogout }) {
                                             {e.category&&<span className="text-xs bg-gray-200 px-2 py-0.5 rounded">{e.category}</span>}
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <span className="text-gray-500">$</span>
-                                            <input 
-                                                type="number" 
-                                                defaultValue={e.amount} 
-                                                onBlur={ev=>{const amt=parseFloat(ev.target.value)||0;setActualBudget(p=>({...p,expenses:p.expenses.map(x=>x.id===e.id?{...x,amount:amt}:x)}));}}
-                                                className="w-24 px-2 py-1 border rounded text-sm text-right"
-                                            />
-                                            <button onClick={()=>delAE(e.id)} className="text-red-500"><Trash/></button>
+                                            <span className="font-bold text-red-700">{formatUSD(e.amount)}</span>
+                                            <button type="button" onClick={()=>delAE(e.id)} className="text-red-500 hover:text-red-700"><Trash/></button>
                                         </div>
                                     </div>
                                 ))}
@@ -4105,10 +4279,12 @@ function App({ currentUser, userModules, onLogout }) {
                         </div>
                     </div>
                 )}
-
                 {/* Money Management - part of Investment module */}
                 {view === 'money' && modules.investment && (
                     <div className="space-y-6">
+                        {/* Wisdom Quote */}
+                        <WisdomQuote type="investment" />
+                        
                         {/* Summary */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div className="bg-white rounded-xl shadow p-4 border-l-4 border-red-500"><p className="text-xs text-gray-500">Total Borrowed</p><p className="text-xl font-bold text-red-600">{formatUSD(totalBorrowed)}</p><p className="text-xs text-gray-400">Interest: ${totalMonthlyInterest.toLocaleString()}/mo</p></div>
