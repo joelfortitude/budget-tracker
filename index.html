@@ -1707,9 +1707,22 @@ function App({ currentUser, userModules, onLogout }) {
     };
     const addBudgetExpense = (name, amount, category) => {
         const newItem = { id: Date.now(), name, amount, date: getMonthDate(), category: category || '' };
-        setActualBudget(prev => ({...prev, expenses: [...prev.expenses, newItem]}));
+        setActualBudget(prev => ({...prev, expenses: [...(prev.expenses || []), newItem]}));
     };
-    const byMonth = (arr, m) => arr.filter(x => { if (!x.date) return false; const d = new Date(x.date); return d.getMonth() === m.getMonth() && d.getFullYear() === m.getFullYear(); });
+    const byMonth = (arr, m) => {
+        if (!arr || !Array.isArray(arr)) return [];
+        return arr.filter(x => { 
+            if (!x.date) return false; 
+            // Parse date more reliably
+            const dateParts = x.date.split('-');
+            if (dateParts.length >= 2) {
+                const itemYear = parseInt(dateParts[0]);
+                const itemMonth = parseInt(dateParts[1]) - 1; // JS months are 0-indexed
+                return itemMonth === m.getMonth() && itemYear === m.getFullYear();
+            }
+            return false;
+        });
+    };
     const changeMonth = dir => setMonth(p => { const d = new Date(p); d.setMonth(d.getMonth() + dir); return d; });
     const fmtMonth = d => d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
@@ -1717,8 +1730,8 @@ function App({ currentUser, userModules, onLogout }) {
     const fixedInc = (fixedBudget.incomes || []).reduce((s, i) => s + toMonthly(i.amount, i.type), 0);
     const fixedExp = (fixedBudget.expenses || []).reduce((s, e) => s + toMonthly(e.amount, e.type), 0);
     const fixedBal = fixedInc - fixedExp;
-    const actualInc = byMonth(actualBudget.incomes || [], month).reduce((s, i) => s + i.amount, 0);
-    const actualExp = byMonth(actualBudget.expenses || [], month).reduce((s, e) => s + e.amount, 0);
+    const actualInc = byMonth(actualBudget.incomes || [], month).reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
+    const actualExp = byMonth(actualBudget.expenses || [], month).reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
     const actualBal = actualInc - actualExp;
 
     // Property metrics calculation
@@ -1895,20 +1908,30 @@ function App({ currentUser, userModules, onLogout }) {
     // Quick add from budget items to actual
     const quickAddActualIncome = (name, amount, category) => {
         const dateStr = month.getFullYear() + '-' + String(month.getMonth() + 1).padStart(2, '0') + '-01';
-        const newItem = { id: Date.now(), name, amount, date: dateStr, category: category || '' };
-        setActualBudget(prev => ({
-            ...prev,
-            incomes: [...(prev.incomes || []), newItem]
-        }));
+        const newItem = { id: Date.now(), name: name, amount: parseFloat(amount) || 0, date: dateStr, category: category || '' };
+        console.log('Adding income:', newItem);
+        setActualBudget(prev => {
+            const newState = {
+                ...prev,
+                incomes: [...(prev.incomes || []), newItem]
+            };
+            console.log('New actualBudget state:', newState);
+            return newState;
+        });
     };
     
     const quickAddActualExpense = (name, amount, category) => {
         const dateStr = month.getFullYear() + '-' + String(month.getMonth() + 1).padStart(2, '0') + '-01';
-        const newItem = { id: Date.now(), name, amount, date: dateStr, category: category || '' };
-        setActualBudget(prev => ({
-            ...prev,
-            expenses: [...(prev.expenses || []), newItem]
-        }));
+        const newItem = { id: Date.now(), name: name, amount: parseFloat(amount) || 0, date: dateStr, category: category || '' };
+        console.log('Adding expense:', newItem);
+        setActualBudget(prev => {
+            const newState = {
+                ...prev,
+                expenses: [...(prev.expenses || []), newItem]
+            };
+            console.log('New actualBudget state:', newState);
+            return newState;
+        });
     };
 
     if (loading) return <div className="min-h-screen animated-bg flex items-center justify-center"><div className="text-center"><div className="animate-spin rounded-full h-16 w-16 border-4 border-white/30 border-t-white mx-auto mb-4"></div><p className="text-white/80 text-lg">Loading WealthWise...</p></div></div>;
