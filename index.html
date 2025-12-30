@@ -39,23 +39,116 @@ const LogOut = () => <Icon d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5
 
 const toast = (ok, msg) => { const t = document.getElementById('toast'); t.className = 'toast ' + (ok ? 'ok' : 'err'); t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2500); };
 
-// User management - stores users list (admin can see usernames, not data)
+// GitHub Gist Storage Configuration
+const GITHUB_TOKEN = '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';
+const GIST_FILENAME = 'budget_tracker_data.json';
+let GIST_ID = localStorage.getItem('budgetGistId') || null;
+let gistData = null;
+let gistLoaded = false;
+let gistSaving = false;
+
+// GitHub Gist API functions
+const gistApi = {
+    async loadGist() {
+        try {
+            if (GIST_ID) {
+                const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                    headers: { 'Authorization': `token ${GITHUB_TOKEN}` }
+                });
+                if (res.ok) {
+                    const gist = await res.json();
+                    if (gist.files[GIST_FILENAME]) {
+                        gistData = JSON.parse(gist.files[GIST_FILENAME].content);
+                        gistLoaded = true;
+                        return gistData;
+                    }
+                }
+            }
+            // Find existing gist or create new
+            const listRes = await fetch('https://api.github.com/gists', {
+                headers: { 'Authorization': `token ${GITHUB_TOKEN}` }
+            });
+            if (listRes.ok) {
+                const gists = await listRes.json();
+                const existing = gists.find(g => g.files[GIST_FILENAME]);
+                if (existing) {
+                    GIST_ID = existing.id;
+                    localStorage.setItem('budgetGistId', GIST_ID);
+                    gistData = JSON.parse(existing.files[GIST_FILENAME].content);
+                    gistLoaded = true;
+                    return gistData;
+                }
+            }
+            // Create new gist
+            gistData = { admin: null, users: [], userData: {} };
+            await gistApi.saveGist();
+            gistLoaded = true;
+            return gistData;
+        } catch (e) {
+            console.error('Gist load error:', e);
+            gistData = { admin: null, users: [], userData: {} };
+            gistLoaded = true;
+            return gistData;
+        }
+    },
+    
+    async saveGist() {
+        if (gistSaving || !gistData) return;
+        gistSaving = true;
+        try {
+            const body = {
+                description: 'Budget Tracker Data - DO NOT DELETE',
+                files: { [GIST_FILENAME]: { content: JSON.stringify(gistData, null, 2) } }
+            };
+            if (GIST_ID) {
+                await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                    method: 'PATCH',
+                    headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+            } else {
+                const res = await fetch('https://api.github.com/gists', {
+                    method: 'POST',
+                    headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...body, public: false })
+                });
+                if (res.ok) {
+                    const gist = await res.json();
+                    GIST_ID = gist.id;
+                    localStorage.setItem('budgetGistId', GIST_ID);
+                }
+            }
+        } catch (e) {
+            console.error('Gist save error:', e);
+        }
+        gistSaving = false;
+    }
+};
+
+// Debounced save to prevent too many API calls
+let saveTimeout = null;
+const debouncedSave = () => {
+    if (saveTimeout) clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => gistApi.saveGist(), 1000);
+};
+
+// User management - now uses gistData
 const USERS_KEY = 'budgetUsers';
 const ADMIN_KEY = 'budgetAdmin';
 const SESSION_KEY = 'budgetSession';
 
-const getUsers = () => { try { return JSON.parse(localStorage.getItem(USERS_KEY)) || []; } catch { return []; } };
-const saveUsers = (users) => localStorage.setItem(USERS_KEY, JSON.stringify(users));
-const getAdmin = () => { try { return JSON.parse(localStorage.getItem(ADMIN_KEY)); } catch { return null; } };
-const saveAdmin = (admin) => localStorage.setItem(ADMIN_KEY, JSON.stringify(admin));
+const getUsers = () => gistData?.users || [];
+const saveUsers = (users) => { if(gistData) { gistData.users = users; debouncedSave(); } };
+const getAdmin = () => gistData?.admin || null;
+const saveAdmin = (admin) => { if(gistData) { gistData.admin = admin; debouncedSave(); } };
 const getSession = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch { return null; } };
 const saveSession = (session) => localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 const clearSession = () => localStorage.removeItem(SESSION_KEY);
 
-// User data storage - each user has their own key
-const getUserDataKey = (username) => 'budgetData_' + username;
-const save = (d, username) => localStorage.setItem(getUserDataKey(username), JSON.stringify(d));
-const load = (username) => { try { return JSON.parse(localStorage.getItem(getUserDataKey(username))); } catch { return null; } };
+// User data storage - each user has their own key in gistData.userData
+const getUserDataKey = (email) => 'user_' + email.replace(/[^a-zA-Z0-9]/g, '_');
+const save = (d, email) => { if(gistData) { gistData.userData[getUserDataKey(email)] = d; debouncedSave(); } };
+const load = (email) => gistData?.userData?.[getUserDataKey(email)] || null;
 
 // Simple hash for passwords (not secure for production, but works for local)
 const hashPassword = (pw) => {
@@ -81,12 +174,11 @@ const LoginScreen = ({ onLogin }) => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState('');
     
-    const admin = getAdmin();
-    const users = getUsers();
-    
     // First time setup - create admin (only if not exists)
     useEffect(() => {
+        const admin = getAdmin();
         if (!admin) setMode('setup');
+        else setMode('login');
     }, []);
     
     const handleSetup = () => {
@@ -115,6 +207,8 @@ const LoginScreen = ({ onLogin }) => {
     const handleLogin = () => {
         setError('');
         const emailLower = email.toLowerCase().trim();
+        const admin = getAdmin();
+        const users = getUsers();
         
         // Check if admin email
         if (emailLower === ADMIN_EMAIL.toLowerCase()) {
@@ -128,7 +222,7 @@ const LoginScreen = ({ onLogin }) => {
         }
         
         // Check regular users by email
-        const user = users.find(u => u.email.toLowerCase() === emailLower);
+        const user = users.find(u => u.email && u.email.toLowerCase() === emailLower);
         if (!user) {
             setError('Email not found. Contact admin to create account.');
             return;
@@ -3210,8 +3304,19 @@ function MainApp() {
     const [currentUser, setCurrentUser] = useState(null);
     const [userModules, setUserModules] = useState(null);
     const [checkingSession, setCheckingSession] = useState(true);
+    const [gistReady, setGistReady] = useState(false);
     
+    // Load Gist data first
     useEffect(() => {
+        gistApi.loadGist().then(() => {
+            setGistReady(true);
+        });
+    }, []);
+    
+    // Check session after gist is loaded
+    useEffect(() => {
+        if (!gistReady) return;
+        
         const session = getSession();
         if (session) {
             // Verify session is still valid
@@ -3222,7 +3327,7 @@ function MainApp() {
                 }
             } else {
                 const users = getUsers();
-                const user = users.find(u => u.username === session.username && u.active);
+                const user = users.find(u => u.email === session.email && u.active);
                 if (user) {
                     setCurrentUser(session);
                     setUserModules(user.modules || { budget: true, investment: true, realEstate: true });
@@ -3230,13 +3335,13 @@ function MainApp() {
             }
         }
         setCheckingSession(false);
-    }, []);
+    }, [gistReady]);
     
     const handleLogin = (user) => {
         setCurrentUser(user);
         if (!user.isAdmin) {
             const users = getUsers();
-            const fullUser = users.find(u => u.username === user.username);
+            const fullUser = users.find(u => u.email === user.email);
             setUserModules(fullUser?.modules || { budget: true, investment: true, realEstate: true });
         }
     };
@@ -3248,8 +3353,13 @@ function MainApp() {
         toast(true, 'Logged out');
     };
     
-    if (checkingSession) {
-        return <div className="min-h-screen flex items-center justify-center"><p>Loading...</p></div>;
+    if (!gistReady || checkingSession) {
+        return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+            <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-600">Loading data from cloud...</p>
+            </div>
+        </div>;
     }
     
     if (!currentUser) {
