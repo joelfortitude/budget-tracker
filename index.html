@@ -804,7 +804,7 @@ const BudgetItemRow = ({ item, type, isAdded, monthlyAmt, onAdd }) => {
                 <span className="text-xs text-gray-500">({item.type})</span>
             </div>
             <div className="flex items-center gap-2">
-                <span className="font-bold">${monthlyAmt.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+                <span className="font-bold">{formatUSD(monthlyAmt)}</span>
                 {!isAdded && (
                     <button 
                         type="button"
@@ -1686,14 +1686,14 @@ function App({ currentUser, userModules, onLogout }) {
                                         <div className="text-4xl mb-4">💰</div>
                                         <h3 className="text-xl font-bold mb-2">Borrowed & Lent Money</h3>
                                         <p className="text-white/80 text-sm mb-4">Track money you've borrowed or lent, with interest calculations</p>
-                                        <p className="text-2xl font-bold">${totalBorrowed.toLocaleString()}</p>
+                                        <p className="text-2xl font-bold">{formatUSD(totalBorrowed)}</p>
                                         <p className="text-sm text-white/70">Currently borrowed</p>
                                     </div>
                                     <div onClick={() => setView('investment')} className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-xl p-6 text-white cursor-pointer card-hover">
                                         <div className="text-4xl mb-4">🏢</div>
                                         <h3 className="text-xl font-bold mb-2">Business Investments</h3>
                                         <p className="text-white/80 text-sm mb-4">Analyze "boring businesses" with SDE calculations</p>
-                                        <p className="text-2xl font-bold">${totalInvValue.toLocaleString()}</p>
+                                        <p className="text-2xl font-bold">{formatUSD(totalInvValue)}</p>
                                         <p className="text-sm text-white/70">Portfolio value</p>
                                     </div>
                                 </>
@@ -1704,7 +1704,7 @@ function App({ currentUser, userModules, onLogout }) {
                                     <h3 className="text-xl font-bold mb-2">Real Estate</h3>
                                     <p className="text-white/80 text-sm mb-4">Manage properties and analyze new deals</p>
                                     <p className="text-2xl font-bold">{realEstate.length} Properties</p>
-                                    <p className="text-sm text-white/70">${totalEquity.toLocaleString(undefined,{maximumFractionDigits:0})} equity</p>
+                                    <p className="text-sm text-white/70">{formatUSD(totalEquity)} equity</p>
                                 </div>
                             )}
                         </div>
@@ -1726,19 +1726,19 @@ function App({ currentUser, userModules, onLogout }) {
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                     <div className="bg-white/10 backdrop-blur rounded-xl p-4 text-center">
                                         <p className="text-xs text-white/70 mb-1">Monthly Income</p>
-                                        <p className="text-xl font-bold">${fixedInc.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
+                                        <p className="text-xl font-bold">{formatUSD(fixedInc)}</p>
                                     </div>
                                     <div className="bg-white/10 backdrop-blur rounded-xl p-4 text-center">
                                         <p className="text-xs text-white/70 mb-1">Monthly Expenses</p>
-                                        <p className="text-xl font-bold">${fixedExp.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
+                                        <p className="text-xl font-bold">{formatUSD(fixedExp)}</p>
                                     </div>
                                     <div className="bg-white/10 backdrop-blur rounded-xl p-4 text-center">
                                         <p className="text-xs text-white/70 mb-1">Monthly Balance</p>
-                                        <p className={`text-xl font-bold ${fixedBal>=0?'text-white':'text-yellow-300'}`}>${fixedBal.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
+                                        <p className={`text-xl font-bold ${fixedBal>=0?'text-white':'text-yellow-300'}`}>{formatUSD(fixedBal)}</p>
                                     </div>
                                     <div className="bg-white/10 backdrop-blur rounded-xl p-4 text-center">
                                         <p className="text-xs text-white/70 mb-1">Annual Balance</p>
-                                        <p className={`text-xl font-bold ${fixedBal>=0?'text-white':'text-yellow-300'}`}>${(fixedBal*12).toLocaleString(undefined,{maximumFractionDigits:0})}</p>
+                                        <p className={`text-xl font-bold ${fixedBal>=0?'text-white':'text-yellow-300'}`}>{formatUSD(fixedBal*12)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -1754,19 +1754,19 @@ function App({ currentUser, userModules, onLogout }) {
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                     <div className="bg-white/10 backdrop-blur rounded-xl p-4 text-center">
                                         <p className="text-xs text-white/70 mb-1">Total Invested</p>
-                                        <p className="text-xl font-bold">${totalInvCost.toLocaleString()}</p>
+                                        <p className="text-xl font-bold">{formatUSD(totalInvCost)}</p>
                                     </div>
                                     <div className="bg-white/10 backdrop-blur rounded-xl p-4 text-center">
                                         <p className="text-xs text-white/70 mb-1">Current Value</p>
-                                        <p className="text-xl font-bold">${totalInvValue.toLocaleString()}</p>
+                                        <p className="text-xl font-bold">{formatUSD(totalInvValue)}</p>
                                     </div>
                                     <div className="bg-white/10 backdrop-blur rounded-xl p-4 text-center">
                                         <p className="text-xs text-white/70 mb-1">Total Gain/Loss</p>
-                                        <p className={`text-xl font-bold ${invGain>=0?'text-green-300':'text-red-300'}`}>{invGain>=0?'+':''}${invGain.toLocaleString()}</p>
+                                        <p className={`text-xl font-bold ${invGain>=0?'text-green-300':'text-red-300'}`}>{invGain>=0?'+':''}{formatUSD(invGain)}</p>
                                     </div>
                                     <div className="bg-white/10 backdrop-blur rounded-xl p-4 text-center">
                                         <p className="text-xs text-white/70 mb-1">Money Borrowed</p>
-                                        <p className="text-xl font-bold text-yellow-300">${totalBorrowed.toLocaleString()}</p>
+                                        <p className="text-xl font-bold text-yellow-300">{formatUSD(totalBorrowed)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -1786,15 +1786,15 @@ function App({ currentUser, userModules, onLogout }) {
                                     </div>
                                     <div className="bg-white/10 backdrop-blur rounded-xl p-4 text-center">
                                         <p className="text-xs text-white/70 mb-1">Total Equity</p>
-                                        <p className="text-xl font-bold">${totalEquity.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
+                                        <p className="text-xl font-bold">{formatUSD(totalEquity)}</p>
                                     </div>
                                     <div className="bg-white/10 backdrop-blur rounded-xl p-4 text-center">
                                         <p className="text-xs text-white/70 mb-1">Monthly Cash Flow</p>
-                                        <p className={`text-xl font-bold ${totalCashFlow>=0?'text-green-300':'text-red-300'}`}>${totalCashFlow.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
+                                        <p className={`text-xl font-bold ${totalCashFlow>=0?'text-green-300':'text-red-300'}`}>{formatUSD(totalCashFlow)}</p>
                                     </div>
                                     <div className="bg-white/10 backdrop-blur rounded-xl p-4 text-center">
                                         <p className="text-xs text-white/70 mb-1">Annual Cash Flow</p>
-                                        <p className={`text-xl font-bold ${totalCashFlow>=0?'text-green-300':'text-red-300'}`}>${(totalCashFlow*12).toLocaleString(undefined,{maximumFractionDigits:0})}</p>
+                                        <p className={`text-xl font-bold ${totalCashFlow>=0?'text-green-300':'text-red-300'}`}>{formatUSD(totalCashFlow*12)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -1808,13 +1808,13 @@ function App({ currentUser, userModules, onLogout }) {
                                 </div>
                                 <div>
                                     <h3 className="font-medium text-slate-400">Total Net Worth</h3>
-                                    <p className="text-4xl font-bold bg-gradient-to-r from-yellow-200 to-amber-300 bg-clip-text text-transparent">${netWorth.toLocaleString()}</p>
+                                    <p className="text-4xl font-bold bg-gradient-to-r from-yellow-200 to-amber-300 bg-clip-text text-transparent">{formatUSD(netWorth)}</p>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-white/10">
-                                {modules.realEstate && <div className="text-center"><p className="text-xs text-slate-400">RE Equity</p><p className="font-bold text-amber-300">${totalEquity.toLocaleString(undefined,{maximumFractionDigits:0})}</p></div>}
-                                {modules.investment && <div className="text-center"><p className="text-xs text-slate-400">Investments</p><p className="font-bold text-violet-300">${totalInvValue.toLocaleString()}</p></div>}
-                                {modules.investment && <div className="text-center"><p className="text-xs text-slate-400">Borrowed</p><p className="font-bold text-red-300">-${totalBorrowed.toLocaleString()}</p></div>}
+                                {modules.realEstate && <div className="text-center"><p className="text-xs text-slate-400">RE Equity</p><p className="font-bold text-amber-300">{formatUSD(totalEquity)}</p></div>}
+                                {modules.investment && <div className="text-center"><p className="text-xs text-slate-400">Investments</p><p className="font-bold text-violet-300">{formatUSD(totalInvValue)}</p></div>}
+                                {modules.investment && <div className="text-center"><p className="text-xs text-slate-400">Borrowed</p><p className="font-bold text-red-300">-{formatUSD(totalBorrowed)}</p></div>}
                             </div>
                         </div>
                         
@@ -1834,9 +1834,9 @@ function App({ currentUser, userModules, onLogout }) {
                         {/* RE Summary Cards */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div className="bg-white rounded-xl shadow p-4 border-l-4 border-purple-500"><p className="text-xs text-gray-500">Total Properties</p><p className="text-xl font-bold">{realEstate.length}</p></div>
-                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-blue-500"><p className="text-xs text-gray-500">Total Equity</p><p className="text-xl font-bold text-blue-600">${totalEquity.toLocaleString(undefined,{maximumFractionDigits:0})}</p></div>
-                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-green-500"><p className="text-xs text-gray-500">Monthly Cash Flow</p><p className={`text-xl font-bold ${totalCashFlow>=0?'text-green-600':'text-red-600'}`}>${totalCashFlow.toLocaleString(undefined,{maximumFractionDigits:0})}</p></div>
-                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-orange-500"><p className="text-xs text-gray-500">Annual Cash Flow</p><p className={`text-xl font-bold ${totalCashFlow>=0?'text-green-600':'text-red-600'}`}>${(totalCashFlow*12).toLocaleString(undefined,{maximumFractionDigits:0})}</p></div>
+                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-blue-500"><p className="text-xs text-gray-500">Total Equity</p><p className="text-xl font-bold text-blue-600">{formatUSD(totalEquity)}</p></div>
+                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-green-500"><p className="text-xs text-gray-500">Monthly Cash Flow</p><p className={`text-xl font-bold ${totalCashFlow>=0?'text-green-600':'text-red-600'}`}>{formatUSD(totalCashFlow)}</p></div>
+                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-orange-500"><p className="text-xs text-gray-500">Annual Cash Flow</p><p className={`text-xl font-bold ${totalCashFlow>=0?'text-green-600':'text-red-600'}`}>{formatUSD(totalCashFlow*12)}</p></div>
                         </div>
                         
                         {/* Property Analyzer Toggle */}
@@ -1947,7 +1947,7 @@ function App({ currentUser, userModules, onLogout }) {
                                             </div>
                                             <div className="bg-blue-50 p-3 rounded-lg text-center">
                                                 <p className="text-xs text-gray-500">Total Cash Needed</p>
-                                                <p className="text-xl font-bold">${totalCashNeeded.toLocaleString()}</p>
+                                                <p className="text-xl font-bold">{formatUSD(totalCashNeeded)}</p>
                                             </div>
                                         </div>
                                     );
@@ -2241,7 +2241,7 @@ function App({ currentUser, userModules, onLogout }) {
                                                                 <div className={`p-3 rounded-lg text-center ${onePercentRule ? 'bg-green-100' : 'bg-red-100'}`}><p className="text-xs text-gray-500">1% Rule</p><p className="text-xl font-bold">{onePercentRule ? '✓ Pass' : '✗ Fail'}</p></div>
                                                             </div>
                                                             <div className="grid grid-cols-2 gap-4 text-sm">
-                                                                <div className="bg-gray-50 p-3 rounded"><p className="font-semibold mb-1">Cash Needed</p><p>Down: ${downPayment.toLocaleString()}</p><p>Closing: ${(a.closingCosts||0).toLocaleString()}</p><p>Rehab: ${(a.rehabCosts||0).toLocaleString()}</p><p className="font-bold border-t mt-1 pt-1">Total: ${totalCashNeeded.toLocaleString()}</p></div>
+                                                                <div className="bg-gray-50 p-3 rounded"><p className="font-semibold mb-1">Cash Needed</p><p>Down: {formatUSD(downPayment)}</p><p>Closing: {formatUSD(a.closingCosts||0)}</p><p>Rehab: {formatUSD(a.rehabCosts||0)}</p><p className="font-bold border-t mt-1 pt-1">Total: {formatUSD(totalCashNeeded)}</p></div>
                                                                 <div className="bg-gray-50 p-3 rounded"><p className="font-semibold mb-1">Monthly</p><p className="text-green-600">Income: ${effectiveRent.toFixed(0)}</p><p className="text-red-600">Expenses: ${totalExpenses.toFixed(0)}</p><p className="text-red-600">Mortgage: ${monthlyMortgage.toFixed(0)}</p><p className="font-bold border-t mt-1 pt-1">Cash Flow: ${cashFlow.toFixed(0)}</p></div>
                                                             </div>
                                                         </div>
@@ -2285,14 +2285,31 @@ function App({ currentUser, userModules, onLogout }) {
                                                     <div className="space-y-2">
                                                         {(analyzer.tenants || []).map((t, idx) => (
                                                             <div key={idx} className="flex items-center gap-2 bg-white p-2 rounded">
-                                                                <input className="flex-1 px-2 py-1 border rounded text-sm" placeholder="Tenant name" value={t.name||''} onChange={e => {const newT=[...(analyzer.tenants||[])];newT[idx]={...newT[idx],name:e.target.value};setAnalyzer({...analyzer,tenants:newT});}} />
+                                                                <input className="flex-1 px-2 py-1 border rounded text-sm" placeholder="Tenant name" value={t.name||''} onChange={e => {
+                                                                    const newTenants = [...(analyzer.tenants || [])];
+                                                                    newTenants[idx] = {...newTenants[idx], name: e.target.value};
+                                                                    setAnalyzer(prev => ({...prev, tenants: newTenants}));
+                                                                }} />
                                                                 <span className="text-gray-500">$</span>
-                                                                <input type="number" className="w-24 px-2 py-1 border rounded text-sm" placeholder="Rent" value={t.rent||''} onChange={e => {const newT=[...(analyzer.tenants||[])];newT[idx]={...newT[idx],rent:parseFloat(e.target.value)||0};const totalRent=newT.reduce((s,x)=>s+(x.rent||0),0);setAnalyzer({...analyzer,tenants:newT,monthlyRent:totalRent});}} />
-                                                                <button onClick={() => {const newT=(analyzer.tenants||[]).filter((_,i)=>i!==idx);const totalRent=newT.reduce((s,x)=>s+(x.rent||0),0);setAnalyzer({...analyzer,tenants:newT,monthlyRent:totalRent});}} className="text-red-500"><Trash/></button>
+                                                                <input type="number" className="w-24 px-2 py-1 border rounded text-sm" placeholder="Rent" value={t.rent||''} onChange={e => {
+                                                                    const newTenants = [...(analyzer.tenants || [])];
+                                                                    newTenants[idx] = {...newTenants[idx], rent: parseFloat(e.target.value) || 0};
+                                                                    const totalRent = newTenants.reduce((sum, tenant) => sum + (tenant.rent || 0), 0);
+                                                                    setAnalyzer(prev => ({...prev, tenants: newTenants, monthlyRent: totalRent}));
+                                                                }} />
+                                                                <button type="button" onClick={() => {
+                                                                    const newTenants = (analyzer.tenants || []).filter((_, i) => i !== idx);
+                                                                    const totalRent = newTenants.reduce((sum, tenant) => sum + (tenant.rent || 0), 0);
+                                                                    setAnalyzer(prev => ({...prev, tenants: newTenants, monthlyRent: totalRent}));
+                                                                }} className="text-red-500"><Trash/></button>
                                                             </div>
                                                         ))}
-                                                        <button onClick={() => setAnalyzer({...analyzer, tenants: [...(analyzer.tenants||[]), {name:'',rent:0}]})} className="text-blue-600 text-sm hover:underline">+ Add Tenant</button>
-                                                        {(analyzer.tenants||[]).length > 0 && <p className="text-xs text-blue-600 mt-1">Total from tenants: {formatUSD((analyzer.tenants||[]).reduce((s,t)=>s+(t.rent||0),0))}/mo</p>}
+                                                        <button type="button" onClick={() => setAnalyzer(prev => ({...prev, tenants: [...(prev.tenants || []), {name: '', rent: 0}]}))} className="text-blue-600 text-sm hover:underline">+ Add Tenant</button>
+                                                        {(analyzer.tenants || []).length > 0 && (
+                                                            <p className="text-xs text-blue-600 mt-1 font-bold">
+                                                                Total from tenants: {formatUSD((analyzer.tenants || []).reduce((sum, t) => sum + (t.rent || 0), 0))}/mo
+                                                            </p>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -2763,7 +2780,7 @@ function App({ currentUser, userModules, onLogout }) {
                                                 </div>
                                                 
                                                 <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
-                                                    <div className="bg-white p-2 rounded text-center"><p className="text-xs text-gray-500">Value</p><p className="font-bold">${(p.currentValue||0).toLocaleString()}</p></div>
+                                                    <div className="bg-white p-2 rounded text-center"><p className="text-xs text-gray-500">Value</p><p className="font-bold">{formatUSD(p.currentValue||0)}</p></div>
                                                     <div className="bg-white p-2 rounded text-center"><p className="text-xs text-gray-500">Equity</p><p className="font-bold text-green-600">${m.equity.toLocaleString(undefined,{maximumFractionDigits:0})}</p></div>
                                                     <div className="bg-white p-2 rounded text-center"><p className="text-xs text-gray-500">Cash Flow</p><p className={`font-bold ${m.cashFlow>=0?'text-green-600':'text-red-600'}`}>${m.cashFlow.toLocaleString(undefined,{maximumFractionDigits:0})}/mo</p></div>
                                                     <div className="bg-white p-2 rounded text-center"><p className="text-xs text-gray-500">Cap Rate</p><p className="font-bold">{m.capRate.toFixed(1)}%</p></div>
@@ -2788,9 +2805,9 @@ function App({ currentUser, userModules, onLogout }) {
                                     <h4 className="font-semibold text-indigo-800 mb-2">📊 Portfolio Summary</h4>
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                                         <div><span className="text-gray-600">Total Value:</span> <span className="font-bold">${totalValue.toLocaleString()}</span></div>
-                                        <div><span className="text-gray-600">Total Equity:</span> <span className="font-bold text-green-600">${totalEquity.toLocaleString(undefined,{maximumFractionDigits:0})}</span></div>
-                                        <div><span className="text-gray-600">Monthly Cash Flow:</span> <span className={`font-bold ${totalCashFlow>=0?'text-green-600':'text-red-600'}`}>${totalCashFlow.toLocaleString(undefined,{maximumFractionDigits:0})}</span></div>
-                                        <div><span className="text-gray-600">Annual Cash Flow:</span> <span className={`font-bold ${totalCashFlow>=0?'text-green-600':'text-red-600'}`}>${(totalCashFlow*12).toLocaleString(undefined,{maximumFractionDigits:0})}</span></div>
+                                        <div><span className="text-gray-600">Total Equity:</span> <span className="font-bold text-green-600">{formatUSD(totalEquity)}</span></div>
+                                        <div><span className="text-gray-600">Monthly Cash Flow:</span> <span className={`font-bold ${totalCashFlow>=0?'text-green-600':'text-red-600'}`}>{formatUSD(totalCashFlow)}</span></div>
+                                        <div><span className="text-gray-600">Annual Cash Flow:</span> <span className={`font-bold ${totalCashFlow>=0?'text-green-600':'text-red-600'}`}>{formatUSD(totalCashFlow*12)}</span></div>
                                     </div>
                                 </div>
                             )}
@@ -2803,9 +2820,9 @@ function App({ currentUser, userModules, onLogout }) {
                     <div className="space-y-6">
                         {/* Investment Summary Cards */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-blue-500"><p className="text-xs text-gray-500">Total Invested</p><p className="text-xl font-bold">${totalInvCost.toLocaleString()}</p></div>
-                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-purple-500"><p className="text-xs text-gray-500">Current Value</p><p className="text-xl font-bold text-purple-600">${totalInvValue.toLocaleString()}</p></div>
-                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-green-500"><p className="text-xs text-gray-500">Total Gain/Loss</p><p className={`text-xl font-bold ${invGain>=0?'text-green-600':'text-red-600'}`}>{invGain>=0?'+':''}${invGain.toLocaleString()}</p></div>
+                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-blue-500"><p className="text-xs text-gray-500">Total Invested</p><p className="text-xl font-bold">{formatUSD(totalInvCost)}</p></div>
+                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-purple-500"><p className="text-xs text-gray-500">Current Value</p><p className="text-xl font-bold text-purple-600">{formatUSD(totalInvValue)}</p></div>
+                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-green-500"><p className="text-xs text-gray-500">Total Gain/Loss</p><p className={`text-xl font-bold ${invGain>=0?'text-green-600':'text-red-600'}`}>{invGain>=0?'+':''}{formatUSD(invGain)}</p></div>
                             <div className="bg-white rounded-xl shadow p-4 border-l-4 border-orange-500"><p className="text-xs text-gray-500">Return %</p><p className={`text-xl font-bold ${invGain>=0?'text-green-600':'text-red-600'}`}>{totalInvCost > 0 ? ((invGain/totalInvCost)*100).toFixed(1) : 0}%</p></div>
                         </div>
 
@@ -3383,8 +3400,8 @@ function App({ currentUser, userModules, onLogout }) {
                 {view === 'budget' && modules.budget && (
                     <div className="space-y-6">
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-white rounded-xl shadow p-4"><h3 className="font-bold mb-2">Monthly</h3><div className="flex justify-between"><span>Income:</span><span className="font-bold text-green-600">${fixedInc.toLocaleString(undefined,{maximumFractionDigits:0})}</span></div><div className="flex justify-between"><span>Expenses:</span><span className="font-bold text-red-600">${fixedExp.toLocaleString(undefined,{maximumFractionDigits:0})}</span></div><div className="flex justify-between pt-2 border-t mt-2"><span className="font-semibold">Balance:</span><span className={`font-bold text-lg ${fixedBal>=0?'text-blue-600':'text-orange-600'}`}>${fixedBal.toLocaleString(undefined,{maximumFractionDigits:0})}</span></div></div>
-                            <div className="bg-white rounded-xl shadow p-4"><h3 className="font-bold mb-2">Annual</h3><div className="flex justify-between"><span>Income:</span><span className="font-bold text-green-600">${(fixedInc*12).toLocaleString(undefined,{maximumFractionDigits:0})}</span></div><div className="flex justify-between"><span>Expenses:</span><span className="font-bold text-red-600">${(fixedExp*12).toLocaleString(undefined,{maximumFractionDigits:0})}</span></div><div className="flex justify-between pt-2 border-t mt-2"><span className="font-semibold">Balance:</span><span className={`font-bold text-lg ${fixedBal>=0?'text-blue-600':'text-orange-600'}`}>${(fixedBal*12).toLocaleString(undefined,{maximumFractionDigits:0})}</span></div></div>
+                            <div className="bg-white rounded-xl shadow p-4"><h3 className="font-bold mb-2">Monthly</h3><div className="flex justify-between"><span>Income:</span><span className="font-bold text-green-600">{formatUSD(fixedInc)}</span></div><div className="flex justify-between"><span>Expenses:</span><span className="font-bold text-red-600">{formatUSD(fixedExp)}</span></div><div className="flex justify-between pt-2 border-t mt-2"><span className="font-semibold">Balance:</span><span className={`font-bold text-lg ${fixedBal>=0?'text-blue-600':'text-orange-600'}`}>{formatUSD(fixedBal)}</span></div></div>
+                            <div className="bg-white rounded-xl shadow p-4"><h3 className="font-bold mb-2">Annual</h3><div className="flex justify-between"><span>Income:</span><span className="font-bold text-green-600">{formatUSD(fixedInc*12)}</span></div><div className="flex justify-between"><span>Expenses:</span><span className="font-bold text-red-600">{formatUSD(fixedExp*12)}</span></div><div className="flex justify-between pt-2 border-t mt-2"><span className="font-semibold">Balance:</span><span className={`font-bold text-lg ${fixedBal>=0?'text-blue-600':'text-orange-600'}`}>{formatUSD(fixedBal*12)}</span></div></div>
                         </div>
 
                         {/* Quick Add Templates */}
@@ -3637,7 +3654,7 @@ function App({ currentUser, userModules, onLogout }) {
                                 <input type="number" value={newFI.amount||''} onChange={e=>setNewFI(p=>({...p,amount:parseFloat(e.target.value)||0}))} className="px-3 py-2 border rounded-lg" placeholder="Amount"/>
                                 <select value={newFI.type} onChange={e=>setNewFI(p=>({...p,type:e.target.value}))} className="px-3 py-2 border rounded-lg bg-white"><option value="weekly">Weekly</option><option value="biweekly">Bi-Weekly</option><option value="semimonthly">Semi-Monthly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="semiannually">Semi-Annually</option><option value="yearly">Yearly</option></select>
                                 <input value={newFI.note||''} onChange={e=>setNewFI(p=>({...p,note:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Note (optional)"/>
-                                <button onClick={addFI} className="bg-green-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
+                                <button type="button" onClick={addFI} className="bg-green-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
                             </div>
                             <div className="space-y-2">{fixedBudget.incomes.map(i=>(
                                 <div key={i.id} className="flex justify-between items-center bg-green-50 p-3 rounded-lg flex-wrap gap-2">
@@ -3688,7 +3705,7 @@ function App({ currentUser, userModules, onLogout }) {
                                     <select value={newFE.type} onChange={e=>setNewFE(p=>({...p,type:e.target.value}))} className="px-3 py-2 border rounded-lg bg-white"><option value="weekly">Weekly</option><option value="biweekly">Bi-Weekly</option><option value="semimonthly">Semi-Monthly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="semiannually">Semi-Annually</option><option value="yearly">Yearly</option></select>
                                     <input value={newFE.category} onChange={e=>setNewFE(p=>({...p,category:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Category"/>
                                     <input value={newFE.note||''} onChange={e=>setNewFE(p=>({...p,note:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Note"/>
-                                    <button onClick={addFE} className="bg-indigo-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
+                                    <button type="button" onClick={addFE} className="bg-indigo-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
                                 </div>
                             </div>
                             <div className="space-y-2">{fixedBudget.expenses.map(e=>(
@@ -3735,17 +3752,17 @@ function App({ currentUser, userModules, onLogout }) {
                             <div className="bg-green-50 rounded-lg p-4 border-l-4 border-green-500">
                                 <p className="text-xs text-gray-600">Actual Income</p>
                                 <p className="text-xl font-bold text-green-700">${actualInc.toLocaleString()}</p>
-                                <p className="text-xs text-gray-500">Budget: ${fixedInc.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
+                                <p className="text-xs text-gray-500">Budget: {formatUSD(fixedInc)}</p>
                             </div>
                             <div className="bg-red-50 rounded-lg p-4 border-l-4 border-red-500">
                                 <p className="text-xs text-gray-600">Actual Expenses</p>
                                 <p className="text-xl font-bold text-red-700">${actualExp.toLocaleString()}</p>
-                                <p className="text-xs text-gray-500">Budget: ${fixedExp.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
+                                <p className="text-xs text-gray-500">Budget: {formatUSD(fixedExp)}</p>
                             </div>
                             <div className={`rounded-lg p-4 border-l-4 ${actualBal>=0?'bg-blue-50 border-blue-500':'bg-orange-50 border-orange-500'}`}>
                                 <p className="text-xs text-gray-600">Balance</p>
                                 <p className={`text-xl font-bold ${actualBal>=0?'text-blue-700':'text-orange-700'}`}>${actualBal.toLocaleString()}</p>
-                                <p className="text-xs text-gray-500">Budget: ${fixedBal.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
+                                <p className="text-xs text-gray-500">Budget: {formatUSD(fixedBal)}</p>
                             </div>
                             <div className={`rounded-lg p-4 border-l-4 ${(actualBal-fixedBal)>=0?'bg-green-50 border-green-500':'bg-red-50 border-red-500'}`}>
                                 <p className="text-xs text-gray-600">vs Budget</p>
@@ -3774,7 +3791,7 @@ function App({ currentUser, userModules, onLogout }) {
                                                     {i.category && <span className="text-xs bg-gray-200 px-2 py-0.5 rounded">{i.category}</span>}
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-bold">${monthlyAmt.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+                                                    <span className="font-bold">{formatUSD(monthlyAmt)}</span>
                                                     {!isAdded && (
                                                         <button 
                                                             type="button"
@@ -3818,7 +3835,7 @@ function App({ currentUser, userModules, onLogout }) {
                                                     {e.category && <span className="text-xs bg-gray-200 px-2 py-0.5 rounded">{e.category}</span>}
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-bold">${monthlyAmt.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+                                                    <span className="font-bold">{formatUSD(monthlyAmt)}</span>
                                                     {!isAdded && (
                                                         <button 
                                                             type="button"
@@ -3849,7 +3866,7 @@ function App({ currentUser, userModules, onLogout }) {
                                 <input value={newAI.name} onChange={e=>setNewAI(p=>({...p,name:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Name"/>
                                 <input type="number" value={newAI.amount||''} onChange={e=>setNewAI(p=>({...p,amount:parseFloat(e.target.value)||0}))} className="px-3 py-2 border rounded-lg" placeholder="Amount"/>
                                 <input type="date" value={newAI.date} onChange={e=>setNewAI(p=>({...p,date:e.target.value}))} className="px-3 py-2 border rounded-lg"/>
-                                <button onClick={addAI} className="bg-green-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
+                                <button type="button" onClick={addAI} className="bg-green-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
                             </div>
                             <div className="space-y-2">
                                 {byMonth(actualBudget.incomes,month).map(i=>(
@@ -3883,7 +3900,7 @@ function App({ currentUser, userModules, onLogout }) {
                                 <input type="number" value={newAE.amount||''} onChange={e=>setNewAE(p=>({...p,amount:parseFloat(e.target.value)||0}))} className="px-3 py-2 border rounded-lg" placeholder="Amount"/>
                                 <input type="date" value={newAE.date} onChange={e=>setNewAE(p=>({...p,date:e.target.value}))} className="px-3 py-2 border rounded-lg"/>
                                 <input value={newAE.category} onChange={e=>setNewAE(p=>({...p,category:e.target.value}))} className="px-3 py-2 border rounded-lg" placeholder="Category"/>
-                                <button onClick={addAE} className="bg-indigo-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
+                                <button type="button" onClick={addAE} className="bg-indigo-600 text-white rounded-lg flex items-center justify-center gap-1"><Plus/>Add</button>
                             </div>
                             <div className="space-y-2">
                                 {byMonth(actualBudget.expenses,month).map(e=>(
@@ -3916,10 +3933,10 @@ function App({ currentUser, userModules, onLogout }) {
                     <div className="space-y-6">
                         {/* Summary */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-red-500"><p className="text-xs text-gray-500">Total Borrowed</p><p className="text-xl font-bold text-red-600">${totalBorrowed.toLocaleString()}</p><p className="text-xs text-gray-400">Interest: ${totalMonthlyInterest.toLocaleString()}/mo</p></div>
+                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-red-500"><p className="text-xs text-gray-500">Total Borrowed</p><p className="text-xl font-bold text-red-600">{formatUSD(totalBorrowed)}</p><p className="text-xs text-gray-400">Interest: ${totalMonthlyInterest.toLocaleString()}/mo</p></div>
                             <div className="bg-white rounded-xl shadow p-4 border-l-4 border-green-500"><p className="text-xs text-gray-500">General Income Pot</p><p className="text-xl font-bold text-green-600">${generalPot.toLocaleString()}</p></div>
                             <div className="bg-white rounded-xl shadow p-4 border-l-4 border-blue-500"><p className="text-xs text-gray-500">Total Transferred</p><p className="text-xl font-bold">${totalTransfersOut.toLocaleString()}</p></div>
-                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-purple-500"><p className="text-xs text-gray-500">Net Worth</p><p className="text-xl font-bold">${netWorth.toLocaleString()}</p></div>
+                            <div className="bg-white rounded-xl shadow p-4 border-l-4 border-purple-500"><p className="text-xs text-gray-500">Net Worth</p><p className="text-xl font-bold">{formatUSD(netWorth)}</p></div>
                         </div>
 
                         {/* Borrowed Money */}
