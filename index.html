@@ -1047,36 +1047,130 @@ function App({ currentUser, userModules, onLogout }) {
         
         // Property Research Details
         research: {
+            // Zoning & Land Use
             zoning: '',
             zoningAllows: '',
+            zoningRestrictions: '',
+            landUse: '',
+            overlay: '',
+            
+            // Environmental
             floodZone: '',
+            floodZoneCode: '',
+            floodInsuranceRequired: '',
             wetlands: '',
+            environmentalHazards: '',
+            soilType: '',
+            
+            // Utilities
             utilities: {
                 water: '',
+                waterProvider: '',
                 sewer: '',
+                sewerType: '', // public, septic, cesspool
                 electric: '',
+                electricProvider: '',
                 gas: '',
-                internet: ''
+                gasProvider: '',
+                internet: '',
+                internetProviders: ''
             },
+            
+            // Schools & Neighborhood
             schoolDistrict: '',
-            schoolRating: '',
+            elementarySchool: '',
+            elementaryRating: '',
+            middleSchool: '',
+            middleRating: '',
+            highSchool: '',
+            highRating: '',
             walkScore: '',
+            transitScore: '',
+            bikeScore: '',
             crimeRate: '',
+            crimeGrade: '',
+            
+            // Nearby Amenities
             nearbyAmenities: '',
+            groceryStores: '',
+            restaurants: '',
+            parks: '',
+            hospitals: '',
+            publicTransit: '',
+            
+            // Development & Future
             futureDevlopment: '',
+            neighborhoodTrend: '', // up, down, stable
+            recentSalesNearby: '',
+            daysOnMarket: '',
+            
+            // HOA & Community
+            hoaName: '',
+            hoaFee: '',
+            hoaFrequency: '', // monthly, quarterly, annual
             hoaRules: '',
+            hoaIncludes: '',
+            
+            // Property Details
             parkingSpaces: '',
+            parkingType: '', // garage, driveway, street
+            garageSize: '',
+            basement: '',
+            basementFinished: '',
+            attic: '',
+            pool: '',
+            fence: '',
+            deck: '',
+            
+            // Structure & Systems
             foundation: '',
+            foundationCondition: '',
             roof: '',
+            roofAge: '',
+            roofCondition: '',
             hvac: '',
+            hvacAge: '',
+            hvacType: '', // central, split, window
+            waterHeater: '',
+            waterHeaterAge: '',
             plumbing: '',
+            plumbingMaterial: '', // copper, pex, galvanized
             electrical: '',
+            electricalAmps: '',
+            electricalPanel: '',
+            windows: '',
+            windowsAge: '',
+            siding: '',
+            sidingCondition: '',
+            
+            // Title & Legal
             lastSaleDate: '',
             lastSalePrice: '',
             taxAssessment: '',
+            annualTaxes: '',
             liens: '',
-            easements: ''
+            easements: '',
+            titleIssues: '',
+            permitHistory: '',
+            codeViolations: '',
+            
+            // Rental Info (if applicable)
+            currentlyRented: '',
+            currentRent: '',
+            leaseExpiration: '',
+            tenantPays: '',
+            
+            // Market Data
+            estimatedValue: '',
+            pricePerSqft: '',
+            comparablesSold: '',
+            marketTrend: ''
         },
+        
+        // Nearby Synagogues - detailed structure
+        nearbySynagogues: [
+            // { name: '', address: '', distance: '', distanceMiles: 0, denomination: '', services: '', rabbi: '', phone: '', website: '', mikpilateName: '', notes: '' }
+        ],
         
         // Photos (base64 or URLs)
         photos: [],
@@ -1092,7 +1186,8 @@ function App({ currentUser, userModules, onLogout }) {
             repairEstimates: false,
             leaseReview: false,
             utilityCheck: false,
-            zoningCheck: false
+            zoningCheck: false,
+            synagogueCheck: false
         },
         
         // Rent Comps
@@ -1105,9 +1200,6 @@ function App({ currentUser, userModules, onLogout }) {
         pros: '',
         cons: '',
         notes: '',
-        
-        // Nearby Synagogues (from extension)
-        nearbySynagogues: [],
         
         // Report metadata
         createdAt: null,
@@ -1123,31 +1215,48 @@ function App({ currentUser, userModules, onLogout }) {
             if (event.data && event.data.type === 'BUDGET_TRACKER_PROPERTY_DATA') {
                 console.log('Received property data from extension:', event.data.payload);
                 const data = event.data.payload;
+                const parseNum = (v) => v ? parseInt(String(v).replace(/[^0-9]/g, '')) || 0 : 0;
+                const parseFloat2 = (v) => v ? parseFloat(String(v).replace(/[^0-9.]/g, '')) || 0 : 0;
                 
                 setAnalyzer(prev => ({
                     ...prev,
+                    // Basic Property Info
                     address: data.address || prev.address,
                     city: data.city || prev.city,
                     state: data.state || prev.state,
                     zipCode: data.zipCode || prev.zipCode,
-                    askingPrice: data.price ? parseInt(data.price.replace(/[^0-9]/g, '')) : prev.askingPrice,
-                    bedrooms: data.bedrooms ? parseInt(data.bedrooms) : prev.bedrooms,
-                    bathrooms: data.bathrooms ? parseFloat(data.bathrooms) : prev.bathrooms,
-                    sqft: data.sqft ? parseInt(data.sqft.replace(/[^0-9]/g, '')) : prev.sqft,
+                    askingPrice: parseNum(data.price) || prev.askingPrice,
+                    bedrooms: parseNum(data.bedrooms) || prev.bedrooms,
+                    bathrooms: parseFloat2(data.bathrooms) || prev.bathrooms,
+                    sqft: parseNum(data.sqft) || prev.sqft,
                     yearBuilt: data.yearBuilt || prev.yearBuilt,
                     lotSize: data.lotSize || prev.lotSize,
                     propertyType: data.propertyType || prev.propertyType,
-                    nearbySynagogues: data.synagogues || prev.nearbySynagogues,
-                    notes: data.synagogues && data.synagogues.length > 0 
-                        ? (prev.notes + '\n\n=== NEARBY SYNAGOGUES ===\n' + data.synagogues.map((s, i) => `${i+1}. ${s.name}${s.address ? ' - ' + s.address : ''}${s.distance ? ' (' + s.distance + ')' : ''}`).join('\n')).trim()
-                        : prev.notes
+                    
+                    // Synagogues
+                    nearbySynagogues: data.synagogues && data.synagogues.length > 0 ? data.synagogues : prev.nearbySynagogues,
+                    
+                    // Research data
+                    research: {
+                        ...prev.research,
+                        walkScore: data.research?.walkScore || prev.research?.walkScore || '',
+                        transitScore: data.research?.transitScore || prev.research?.transitScore || '',
+                        estimatedValue: data.research?.estimatedValue || prev.research?.estimatedValue || '',
+                        pricePerSqft: data.research?.pricePerSqft || prev.research?.pricePerSqft || '',
+                        daysOnMarket: data.research?.daysOnMarket || data.daysOnMarket || prev.research?.daysOnMarket || '',
+                        annualTaxes: data.research?.annualTaxes || prev.research?.annualTaxes || '',
+                        hoaFee: data.research?.hoaFee || prev.research?.hoaFee || '',
+                        parkingSpaces: data.research?.parking || data.parking || prev.research?.parkingSpaces || '',
+                        hvac: data.research?.hvac || prev.research?.hvac || ''
+                    }
                 }));
                 
-                toast(true, 'Property data imported from extension!');
+                toast(true, 'Property data imported! Check Research tab for synagogues.');
                 
-                // Switch to Real Estate tab
+                // Switch to Real Estate tab and research sub-tab
                 setActiveTab('realestate');
                 setReTab('analyzer');
+                setAnalyzerTab('research');
             }
         };
         
@@ -1816,26 +1925,46 @@ function App({ currentUser, userModules, onLogout }) {
                                             if (extData) {
                                                 try {
                                                     const data = JSON.parse(extData);
+                                                    const parseNum = (v) => v ? parseInt(String(v).replace(/[^0-9]/g, '')) || 0 : 0;
+                                                    const parseFloat2 = (v) => v ? parseFloat(String(v).replace(/[^0-9.]/g, '')) || 0 : 0;
+                                                    
                                                     setAnalyzer(prev => ({
                                                         ...prev,
+                                                        // Basic Property Info
                                                         address: data.address || prev.address,
                                                         city: data.city || prev.city,
                                                         state: data.state || prev.state,
                                                         zipCode: data.zipCode || prev.zipCode,
-                                                        askingPrice: data.price ? parseInt(data.price.replace(/[^0-9]/g, '')) : prev.askingPrice,
-                                                        bedrooms: data.bedrooms ? parseInt(data.bedrooms) : prev.bedrooms,
-                                                        bathrooms: data.bathrooms ? parseFloat(data.bathrooms) : prev.bathrooms,
-                                                        sqft: data.sqft ? parseInt(data.sqft.replace(/[^0-9]/g, '')) : prev.sqft,
+                                                        askingPrice: parseNum(data.price) || prev.askingPrice,
+                                                        bedrooms: parseNum(data.bedrooms) || prev.bedrooms,
+                                                        bathrooms: parseFloat2(data.bathrooms) || prev.bathrooms,
+                                                        sqft: parseNum(data.sqft) || prev.sqft,
                                                         yearBuilt: data.yearBuilt || prev.yearBuilt,
                                                         lotSize: data.lotSize || prev.lotSize,
-                                                        nearbySynagogues: data.synagogues || prev.nearbySynagogues,
-                                                        notes: data.synagogues && data.synagogues.length > 0 
-                                                            ? (prev.notes + '\n\n=== NEARBY SYNAGOGUES ===\n' + data.synagogues.map((s, i) => `${i+1}. ${s.name}${s.address ? ' - ' + s.address : ''}${s.distance ? ' (' + s.distance + ')' : ''}`).join('\n')).trim()
-                                                            : prev.notes
+                                                        propertyType: data.propertyType || prev.propertyType,
+                                                        
+                                                        // Synagogues - direct array
+                                                        nearbySynagogues: data.synagogues && data.synagogues.length > 0 ? data.synagogues : prev.nearbySynagogues,
+                                                        
+                                                        // Research data from extension
+                                                        research: {
+                                                            ...prev.research,
+                                                            walkScore: data.research?.walkScore || prev.research?.walkScore || '',
+                                                            transitScore: data.research?.transitScore || prev.research?.transitScore || '',
+                                                            estimatedValue: data.research?.estimatedValue || prev.research?.estimatedValue || '',
+                                                            pricePerSqft: data.research?.pricePerSqft || prev.research?.pricePerSqft || '',
+                                                            daysOnMarket: data.research?.daysOnMarket || data.daysOnMarket || prev.research?.daysOnMarket || '',
+                                                            annualTaxes: data.research?.annualTaxes || prev.research?.annualTaxes || '',
+                                                            hoaFee: data.research?.hoaFee || prev.research?.hoaFee || '',
+                                                            parkingSpaces: data.research?.parking || data.parking || prev.research?.parkingSpaces || '',
+                                                            hvac: data.research?.hvac || prev.research?.hvac || ''
+                                                        }
                                                     }));
                                                     localStorage.removeItem('budgetTrackerExtensionData');
-                                                    toast(true, 'Property data imported from extension!');
+                                                    toast(true, 'Property data imported! Check Research tab for synagogues.');
+                                                    setAnalyzerTab('research');
                                                 } catch (e) {
+                                                    console.error('Import error:', e);
                                                     toast(false, 'Error parsing extension data');
                                                 }
                                             } else {
@@ -2020,32 +2149,192 @@ function App({ currentUser, userModules, onLogout }) {
                                 
                                 {/* Tab: Research */}
                                 {analyzerTab === 'research' && (
-                                    <div className="bg-white p-4 rounded-lg">
-                                        <h3 className="font-bold text-gray-700 mb-3">🔬 Property Research Details</h3>
-                                        <p className="text-sm text-gray-500 mb-4">Use the research buttons above to find this info, then paste it here.</p>
-                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                            <div><label className="text-xs text-gray-500">Zoning</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="e.g. R-1, C-2" value={analyzer.research?.zoning || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, zoning: e.target.value}})} /></div>
-                                            <div><label className="text-xs text-gray-500">Zoning Allows</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="e.g. SFH, Duplex, ADU" value={analyzer.research?.zoningAllows || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, zoningAllows: e.target.value}})} /></div>
-                                            <div><label className="text-xs text-gray-500">Flood Zone</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="e.g. Zone X, AE" value={analyzer.research?.floodZone || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, floodZone: e.target.value}})} /></div>
-                                            <div><label className="text-xs text-gray-500">Wetlands</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="Yes/No/Partial" value={analyzer.research?.wetlands || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, wetlands: e.target.value}})} /></div>
-                                            <div><label className="text-xs text-gray-500">School District</label><input className="w-full px-3 py-2 border rounded-lg" value={analyzer.research?.schoolDistrict || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, schoolDistrict: e.target.value}})} /></div>
-                                            <div><label className="text-xs text-gray-500">School Rating</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="e.g. 8/10" value={analyzer.research?.schoolRating || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, schoolRating: e.target.value}})} /></div>
-                                            <div><label className="text-xs text-gray-500">Walk Score</label><input className="w-full px-3 py-2 border rounded-lg" value={analyzer.research?.walkScore || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, walkScore: e.target.value}})} /></div>
-                                            <div><label className="text-xs text-gray-500">Crime Rate</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="Low/Medium/High" value={analyzer.research?.crimeRate || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, crimeRate: e.target.value}})} /></div>
-                                            <div><label className="text-xs text-gray-500">Foundation</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="e.g. Slab, Crawl, Basement" value={analyzer.research?.foundation || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, foundation: e.target.value}})} /></div>
-                                            <div><label className="text-xs text-gray-500">Roof</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="e.g. Shingle 2020" value={analyzer.research?.roof || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, roof: e.target.value}})} /></div>
-                                            <div><label className="text-xs text-gray-500">HVAC</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="e.g. Central AC 2018" value={analyzer.research?.hvac || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, hvac: e.target.value}})} /></div>
-                                            <div><label className="text-xs text-gray-500">Plumbing</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="e.g. Copper, PEX" value={analyzer.research?.plumbing || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, plumbing: e.target.value}})} /></div>
-                                            <div><label className="text-xs text-gray-500">Electrical</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="e.g. 200 amp" value={analyzer.research?.electrical || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, electrical: e.target.value}})} /></div>
-                                            <div><label className="text-xs text-gray-500">Water/Sewer</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="e.g. City/Septic" value={analyzer.research?.utilities?.water || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, utilities: {...analyzer.research?.utilities, water: e.target.value}}})} /></div>
-                                            <div><label className="text-xs text-gray-500">Last Sale Date</label><input className="w-full px-3 py-2 border rounded-lg" value={analyzer.research?.lastSaleDate || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, lastSaleDate: e.target.value}})} /></div>
-                                            <div><label className="text-xs text-gray-500">Last Sale Price</label><input className="w-full px-3 py-2 border rounded-lg" value={analyzer.research?.lastSalePrice || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, lastSalePrice: e.target.value}})} /></div>
-                                            <div><label className="text-xs text-gray-500">Tax Assessment</label><input className="w-full px-3 py-2 border rounded-lg" value={analyzer.research?.taxAssessment || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, taxAssessment: e.target.value}})} /></div>
-                                            <div><label className="text-xs text-gray-500">Liens/Issues</label><input className="w-full px-3 py-2 border rounded-lg" value={analyzer.research?.liens || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, liens: e.target.value}})} /></div>
+                                    <div className="space-y-4">
+                                        {/* Synagogues Section - Top Priority */}
+                                        <div className="bg-indigo-50 p-4 rounded-lg border-2 border-indigo-200">
+                                            <div className="flex justify-between items-center mb-3">
+                                                <h3 className="font-bold text-indigo-800">🕍 Nearby Synagogues</h3>
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => window.open(`https://www.google.com/maps/search/synagogue+near+${encodeURIComponent(analyzer.address)}`, '_blank')} className="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700">Search Google Maps</button>
+                                                    <button onClick={() => window.open(`https://www.goshul.com/`, '_blank')} className="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700">GoShul.com</button>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Add Synagogue Form */}
+                                            <div className="bg-white p-3 rounded-lg mb-3">
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
+                                                    <input id="shulName" className="px-3 py-2 border rounded-lg text-sm" placeholder="Shul Name" />
+                                                    <input id="shulAddress" className="px-3 py-2 border rounded-lg text-sm" placeholder="Address" />
+                                                    <input id="shulDistance" className="px-3 py-2 border rounded-lg text-sm" placeholder="Distance (e.g. 0.8 mi)" />
+                                                    <select id="shulDenomination" className="px-3 py-2 border rounded-lg text-sm bg-white">
+                                                        <option value="">Denomination</option>
+                                                        <option value="Orthodox">Orthodox</option>
+                                                        <option value="Modern Orthodox">Modern Orthodox</option>
+                                                        <option value="Chabad">Chabad</option>
+                                                        <option value="Young Israel">Young Israel</option>
+                                                        <option value="Conservative">Conservative</option>
+                                                        <option value="Reform">Reform</option>
+                                                        <option value="Sephardic">Sephardic</option>
+                                                        <option value="Other">Other</option>
+                                                    </select>
+                                                </div>
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
+                                                    <input id="shulRabbi" className="px-3 py-2 border rounded-lg text-sm" placeholder="Rabbi" />
+                                                    <input id="shulPhone" className="px-3 py-2 border rounded-lg text-sm" placeholder="Phone" />
+                                                    <input id="shulWebsite" className="px-3 py-2 border rounded-lg text-sm" placeholder="Website" />
+                                                    <input id="shulServices" className="px-3 py-2 border rounded-lg text-sm" placeholder="Minyan times" />
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <input id="shulNotes" className="flex-1 px-3 py-2 border rounded-lg text-sm" placeholder="Notes (mikvah nearby, eruv, etc.)" />
+                                                    <button 
+                                                        onClick={() => {
+                                                            const shul = {
+                                                                name: document.getElementById('shulName').value,
+                                                                address: document.getElementById('shulAddress').value,
+                                                                distance: document.getElementById('shulDistance').value,
+                                                                distanceMiles: parseFloat(document.getElementById('shulDistance').value) || 0,
+                                                                denomination: document.getElementById('shulDenomination').value,
+                                                                rabbi: document.getElementById('shulRabbi').value,
+                                                                phone: document.getElementById('shulPhone').value,
+                                                                website: document.getElementById('shulWebsite').value,
+                                                                services: document.getElementById('shulServices').value,
+                                                                notes: document.getElementById('shulNotes').value
+                                                            };
+                                                            if (shul.name) {
+                                                                setAnalyzer({...analyzer, nearbySynagogues: [...(analyzer.nearbySynagogues || []), shul]});
+                                                                ['shulName','shulAddress','shulDistance','shulDenomination','shulRabbi','shulPhone','shulWebsite','shulServices','shulNotes'].forEach(id => document.getElementById(id).value = '');
+                                                                toast(true, 'Synagogue added');
+                                                            }
+                                                        }}
+                                                        className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700"
+                                                    >+ Add Shul</button>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Synagogues List */}
+                                            {analyzer.nearbySynagogues && analyzer.nearbySynagogues.length > 0 ? (
+                                                <div className="space-y-2">
+                                                    {analyzer.nearbySynagogues.map((shul, i) => (
+                                                        <div key={i} className="bg-white p-3 rounded-lg flex justify-between items-start">
+                                                            <div className="flex-1">
+                                                                <div className="font-semibold text-indigo-800">{shul.name} {shul.denomination && <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-1 rounded ml-2">{shul.denomination}</span>}</div>
+                                                                {shul.address && <div className="text-sm text-gray-600">📍 {shul.address}</div>}
+                                                                {shul.distance && <div className="text-sm text-gray-600">🚶 {shul.distance}</div>}
+                                                                {shul.rabbi && <div className="text-sm text-gray-600">👤 Rabbi: {shul.rabbi}</div>}
+                                                                {shul.phone && <div className="text-sm text-gray-600">📞 {shul.phone}</div>}
+                                                                {shul.services && <div className="text-sm text-gray-600">🕐 {shul.services}</div>}
+                                                                {shul.website && <div className="text-sm"><a href={shul.website.startsWith('http') ? shul.website : 'https://' + shul.website} target="_blank" className="text-blue-500 hover:underline">🌐 Website</a></div>}
+                                                                {shul.notes && <div className="text-xs text-gray-500 mt-1 italic">{shul.notes}</div>}
+                                                            </div>
+                                                            <button onClick={() => setAnalyzer({...analyzer, nearbySynagogues: analyzer.nearbySynagogues.filter((_, idx) => idx !== i)})} className="text-red-500 hover:bg-red-100 p-2 rounded">🗑️</button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-sm text-gray-500 italic">No synagogues added yet. Use the extension or add manually.</p>
+                                            )}
                                         </div>
-                                        <div className="mt-4">
-                                            <label className="text-xs text-gray-500">Nearby Amenities / Future Development Notes</label>
-                                            <textarea className="w-full px-3 py-2 border rounded-lg h-20" value={analyzer.research?.nearbyAmenities || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, nearbyAmenities: e.target.value}})} />
+                                        
+                                        {/* Zoning & Land Use */}
+                                        <div className="bg-white p-4 rounded-lg">
+                                            <h3 className="font-bold text-gray-700 mb-3">🏛️ Zoning & Land Use</h3>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                <div><label className="text-xs text-gray-500">Zoning Code</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="e.g. R-1, C-2" value={analyzer.research?.zoning || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, zoning: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Zoning Allows</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="SFH, Duplex, ADU" value={analyzer.research?.zoningAllows || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, zoningAllows: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Restrictions</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="Setbacks, height limits" value={analyzer.research?.zoningRestrictions || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, zoningRestrictions: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Land Use</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="Residential, Mixed" value={analyzer.research?.landUse || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, landUse: e.target.value}})} /></div>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Environmental */}
+                                        <div className="bg-white p-4 rounded-lg">
+                                            <h3 className="font-bold text-gray-700 mb-3">🌊 Environmental</h3>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                <div><label className="text-xs text-gray-500">Flood Zone</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="X, AE, VE" value={analyzer.research?.floodZone || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, floodZone: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Flood Insurance Req?</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="Yes/No" value={analyzer.research?.floodInsuranceRequired || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, floodInsuranceRequired: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Wetlands</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="Yes/No/Partial" value={analyzer.research?.wetlands || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, wetlands: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Env. Hazards</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="None, Lead, Asbestos" value={analyzer.research?.environmentalHazards || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, environmentalHazards: e.target.value}})} /></div>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Utilities */}
+                                        <div className="bg-white p-4 rounded-lg">
+                                            <h3 className="font-bold text-gray-700 mb-3">💡 Utilities</h3>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                <div><label className="text-xs text-gray-500">Water</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="City/Well" value={analyzer.research?.utilities?.water || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, utilities: {...analyzer.research?.utilities, water: e.target.value}}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Sewer</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="City/Septic" value={analyzer.research?.utilities?.sewer || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, utilities: {...analyzer.research?.utilities, sewer: e.target.value}}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Electric Provider</label><input className="w-full px-3 py-2 border rounded-lg" value={analyzer.research?.utilities?.electricProvider || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, utilities: {...analyzer.research?.utilities, electricProvider: e.target.value}}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Gas</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="Natural/Propane/None" value={analyzer.research?.utilities?.gas || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, utilities: {...analyzer.research?.utilities, gas: e.target.value}}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Internet Providers</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="Xfinity, Verizon" value={analyzer.research?.utilities?.internetProviders || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, utilities: {...analyzer.research?.utilities, internetProviders: e.target.value}}})} /></div>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Schools & Walkability */}
+                                        <div className="bg-white p-4 rounded-lg">
+                                            <h3 className="font-bold text-gray-700 mb-3">🏫 Schools & Walkability</h3>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                <div><label className="text-xs text-gray-500">School District</label><input className="w-full px-3 py-2 border rounded-lg" value={analyzer.research?.schoolDistrict || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, schoolDistrict: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Elementary School</label><input className="w-full px-3 py-2 border rounded-lg" value={analyzer.research?.elementarySchool || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, elementarySchool: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Elementary Rating</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="/10" value={analyzer.research?.elementaryRating || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, elementaryRating: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">High School</label><input className="w-full px-3 py-2 border rounded-lg" value={analyzer.research?.highSchool || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, highSchool: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Walk Score</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="/100" value={analyzer.research?.walkScore || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, walkScore: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Transit Score</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="/100" value={analyzer.research?.transitScore || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, transitScore: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Crime Rate/Grade</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="A, B, C / Low" value={analyzer.research?.crimeGrade || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, crimeGrade: e.target.value}})} /></div>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Structure & Systems */}
+                                        <div className="bg-white p-4 rounded-lg">
+                                            <h3 className="font-bold text-gray-700 mb-3">🔧 Structure & Systems</h3>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                <div><label className="text-xs text-gray-500">Foundation</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="Slab/Crawl/Basement" value={analyzer.research?.foundation || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, foundation: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Roof Type & Age</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="Shingle, 2020" value={analyzer.research?.roof || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, roof: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">HVAC Type & Age</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="Central AC, 2018" value={analyzer.research?.hvac || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, hvac: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Water Heater</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="Tank/Tankless, Age" value={analyzer.research?.waterHeater || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, waterHeater: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Plumbing Material</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="Copper/PEX/Galv" value={analyzer.research?.plumbingMaterial || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, plumbingMaterial: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Electrical Panel</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="200 amp, Breakers" value={analyzer.research?.electricalPanel || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, electricalPanel: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Windows</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="Double pane, 2015" value={analyzer.research?.windows || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, windows: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Siding</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="Vinyl/Brick/Stucco" value={analyzer.research?.siding || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, siding: e.target.value}})} /></div>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* HOA */}
+                                        <div className="bg-white p-4 rounded-lg">
+                                            <h3 className="font-bold text-gray-700 mb-3">🏘️ HOA & Parking</h3>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                <div><label className="text-xs text-gray-500">HOA Name</label><input className="w-full px-3 py-2 border rounded-lg" value={analyzer.research?.hoaName || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, hoaName: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">HOA Fee</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="$xxx/month" value={analyzer.research?.hoaFee || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, hoaFee: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">HOA Includes</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="Water, Lawn, Pool" value={analyzer.research?.hoaIncludes || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, hoaIncludes: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Parking</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="2 car garage" value={analyzer.research?.parkingSpaces || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, parkingSpaces: e.target.value}})} /></div>
+                                            </div>
+                                            <div className="mt-3"><label className="text-xs text-gray-500">HOA Rules/Restrictions</label><textarea className="w-full px-3 py-2 border rounded-lg h-16" placeholder="Rental restrictions, pet rules, etc." value={analyzer.research?.hoaRules || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, hoaRules: e.target.value}})} /></div>
+                                        </div>
+                                        
+                                        {/* Title & Legal */}
+                                        <div className="bg-white p-4 rounded-lg">
+                                            <h3 className="font-bold text-gray-700 mb-3">📜 Title & Legal</h3>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                <div><label className="text-xs text-gray-500">Last Sale Date</label><input className="w-full px-3 py-2 border rounded-lg" value={analyzer.research?.lastSaleDate || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, lastSaleDate: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Last Sale Price</label><input className="w-full px-3 py-2 border rounded-lg" value={analyzer.research?.lastSalePrice || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, lastSalePrice: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Tax Assessment</label><input className="w-full px-3 py-2 border rounded-lg" value={analyzer.research?.taxAssessment || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, taxAssessment: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Annual Taxes</label><input className="w-full px-3 py-2 border rounded-lg" value={analyzer.research?.annualTaxes || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, annualTaxes: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Liens</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="None" value={analyzer.research?.liens || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, liens: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Easements</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="None" value={analyzer.research?.easements || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, easements: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Permit History</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="All permits closed" value={analyzer.research?.permitHistory || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, permitHistory: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Code Violations</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="None" value={analyzer.research?.codeViolations || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, codeViolations: e.target.value}})} /></div>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Market Data */}
+                                        <div className="bg-white p-4 rounded-lg">
+                                            <h3 className="font-bold text-gray-700 mb-3">📊 Market Data</h3>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                <div><label className="text-xs text-gray-500">Zestimate/Redfin Est</label><input className="w-full px-3 py-2 border rounded-lg" value={analyzer.research?.estimatedValue || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, estimatedValue: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Price/Sqft</label><input className="w-full px-3 py-2 border rounded-lg" value={analyzer.research?.pricePerSqft || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, pricePerSqft: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Days on Market</label><input className="w-full px-3 py-2 border rounded-lg" value={analyzer.research?.daysOnMarket || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, daysOnMarket: e.target.value}})} /></div>
+                                                <div><label className="text-xs text-gray-500">Market Trend</label><input className="w-full px-3 py-2 border rounded-lg" placeholder="Hot/Warm/Cold" value={analyzer.research?.marketTrend || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, marketTrend: e.target.value}})} /></div>
+                                            </div>
+                                            <div className="mt-3"><label className="text-xs text-gray-500">Nearby Amenities & Notes</label><textarea className="w-full px-3 py-2 border rounded-lg h-20" placeholder="Shopping, restaurants, parks, future development..." value={analyzer.research?.nearbyAmenities || ''} onChange={e => setAnalyzer({...analyzer, research: {...analyzer.research, nearbyAmenities: e.target.value}})} /></div>
                                         </div>
                                     </div>
                                 )}
