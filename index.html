@@ -3811,7 +3811,7 @@ function App({ currentUser, userModules, onLogout }) {
                                                                 var dateStr = month.getFullYear() + '-' + String(month.getMonth() + 1).padStart(2, '0') + '-01';
                                                                 var newItem = { id: Date.now(), name: i.name, amount: monthlyAmt, date: dateStr, category: i.category || '' };
                                                                 setActualBudget(function(prev) {
-                                                                    return {...prev, incomes: prev.incomes.concat([newItem])};
+                                                                    return {...prev, incomes: (prev.incomes || []).concat([newItem])};
                                                                 });
                                                             }}
                                                             className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
@@ -3855,7 +3855,7 @@ function App({ currentUser, userModules, onLogout }) {
                                                                 var dateStr = month.getFullYear() + '-' + String(month.getMonth() + 1).padStart(2, '0') + '-01';
                                                                 var newItem = { id: Date.now(), name: e.name, amount: monthlyAmt, date: dateStr, category: e.category || '' };
                                                                 setActualBudget(function(prev) {
-                                                                    return {...prev, expenses: prev.expenses.concat([newItem])};
+                                                                    return {...prev, expenses: (prev.expenses || []).concat([newItem])};
                                                                 });
                                                             }}
                                                             className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
