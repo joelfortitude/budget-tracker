@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="utf-8">
+<head><meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Budget &amp; Investment Tracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -1106,6 +1106,9 @@ function App({ currentUser, userModules, onLogout }) {
         cons: '',
         notes: '',
         
+        // Nearby Synagogues (from extension)
+        nearbySynagogues: [],
+        
         // Report metadata
         createdAt: null,
         updatedAt: null
@@ -1113,6 +1116,66 @@ function App({ currentUser, userModules, onLogout }) {
     
     // Property Analyzer State
     const [analyzer, setAnalyzer] = useState({...defaultAnalyzer});
+    
+    // Listen for data from Chrome Extension
+    useEffect(() => {
+        const handleExtensionData = (event) => {
+            if (event.data && event.data.type === 'BUDGET_TRACKER_PROPERTY_DATA') {
+                console.log('Received property data from extension:', event.data.payload);
+                const data = event.data.payload;
+                
+                setAnalyzer(prev => ({
+                    ...prev,
+                    address: data.address || prev.address,
+                    city: data.city || prev.city,
+                    state: data.state || prev.state,
+                    zipCode: data.zipCode || prev.zipCode,
+                    askingPrice: data.price ? parseInt(data.price.replace(/[^0-9]/g, '')) : prev.askingPrice,
+                    bedrooms: data.bedrooms ? parseInt(data.bedrooms) : prev.bedrooms,
+                    bathrooms: data.bathrooms ? parseFloat(data.bathrooms) : prev.bathrooms,
+                    sqft: data.sqft ? parseInt(data.sqft.replace(/[^0-9]/g, '')) : prev.sqft,
+                    yearBuilt: data.yearBuilt || prev.yearBuilt,
+                    lotSize: data.lotSize || prev.lotSize,
+                    propertyType: data.propertyType || prev.propertyType,
+                    nearbySynagogues: data.synagogues || prev.nearbySynagogues,
+                    notes: data.synagogues && data.synagogues.length > 0 
+                        ? (prev.notes + '\n\n=== NEARBY SYNAGOGUES ===\n' + data.synagogues.map((s, i) => `${i+1}. ${s.name}${s.address ? ' - ' + s.address : ''}${s.distance ? ' (' + s.distance + ')' : ''}`).join('\n')).trim()
+                        : prev.notes
+                }));
+                
+                toast(true, 'Property data imported from extension!');
+                
+                // Switch to Real Estate tab
+                setActiveTab('realestate');
+                setReTab('analyzer');
+            }
+        };
+        
+        window.addEventListener('message', handleExtensionData);
+        
+        // Also check localStorage for extension data (backup method)
+        const checkLocalStorage = () => {
+            const extData = localStorage.getItem('budgetTrackerExtensionData');
+            if (extData) {
+                try {
+                    const data = JSON.parse(extData);
+                    handleExtensionData({ data: { type: 'BUDGET_TRACKER_PROPERTY_DATA', payload: data } });
+                    localStorage.removeItem('budgetTrackerExtensionData');
+                } catch (e) {
+                    console.error('Error parsing extension data:', e);
+                }
+            }
+        };
+        
+        // Check on mount and periodically
+        checkLocalStorage();
+        const interval = setInterval(checkLocalStorage, 2000);
+        
+        return () => {
+            window.removeEventListener('message', handleExtensionData);
+            clearInterval(interval);
+        };
+    }, []);
     
     // Form state
     const [newFI, setNewFI] = useState({ name: '', amount: 0, type: 'monthly' });
@@ -1742,8 +1805,48 @@ function App({ currentUser, userModules, onLogout }) {
                         {/* Property Analyzer Form */}
                         {showAnalyzer && (
                             <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl shadow-lg p-6 border-2 border-orange-200">
-                                <h2 className="text-xl font-bold text-orange-800 mb-2">🔍 New Property Analyzer</h2>
-                                <p className="text-sm text-gray-600 mb-4">Evaluate a potential property before buying. Fill in the details to see if it's worth it.</p>
+                                <div className="flex justify-between items-start mb-2">
+                                    <div>
+                                        <h2 className="text-xl font-bold text-orange-800">🔍 New Property Analyzer</h2>
+                                        <p className="text-sm text-gray-600 mb-4">Evaluate a potential property before buying. Fill in the details to see if it's worth it.</p>
+                                    </div>
+                                    <button 
+                                        onClick={() => {
+                                            const extData = localStorage.getItem('budgetTrackerExtensionData');
+                                            if (extData) {
+                                                try {
+                                                    const data = JSON.parse(extData);
+                                                    setAnalyzer(prev => ({
+                                                        ...prev,
+                                                        address: data.address || prev.address,
+                                                        city: data.city || prev.city,
+                                                        state: data.state || prev.state,
+                                                        zipCode: data.zipCode || prev.zipCode,
+                                                        askingPrice: data.price ? parseInt(data.price.replace(/[^0-9]/g, '')) : prev.askingPrice,
+                                                        bedrooms: data.bedrooms ? parseInt(data.bedrooms) : prev.bedrooms,
+                                                        bathrooms: data.bathrooms ? parseFloat(data.bathrooms) : prev.bathrooms,
+                                                        sqft: data.sqft ? parseInt(data.sqft.replace(/[^0-9]/g, '')) : prev.sqft,
+                                                        yearBuilt: data.yearBuilt || prev.yearBuilt,
+                                                        lotSize: data.lotSize || prev.lotSize,
+                                                        nearbySynagogues: data.synagogues || prev.nearbySynagogues,
+                                                        notes: data.synagogues && data.synagogues.length > 0 
+                                                            ? (prev.notes + '\n\n=== NEARBY SYNAGOGUES ===\n' + data.synagogues.map((s, i) => `${i+1}. ${s.name}${s.address ? ' - ' + s.address : ''}${s.distance ? ' (' + s.distance + ')' : ''}`).join('\n')).trim()
+                                                            : prev.notes
+                                                    }));
+                                                    localStorage.removeItem('budgetTrackerExtensionData');
+                                                    toast(true, 'Property data imported from extension!');
+                                                } catch (e) {
+                                                    toast(false, 'Error parsing extension data');
+                                                }
+                                            } else {
+                                                toast(false, 'No extension data found. Use the Chrome extension first.');
+                                            }
+                                        }}
+                                        className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-700 flex items-center gap-2"
+                                    >
+                                        📥 Import from Extension
+                                    </button>
+                                </div>
                                 
                                 {/* Tabs */}
                                 <div className="flex gap-1 mb-4 flex-wrap bg-white rounded-lg p-1">
@@ -1766,6 +1869,7 @@ function App({ currentUser, userModules, onLogout }) {
                                                 <button onClick={() => window.open(`https://www.redfin.com/search?q=${encodeURIComponent(analyzer.address)}`, '_blank')} className="bg-red-500 text-white px-3 py-2 rounded-lg text-sm hover:bg-red-600">🔴 Redfin</button>
                                                 <button onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(analyzer.address + ' county property records')}`, '_blank')} className="bg-gray-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-gray-700">🏛️ County Records</button>
                                                 <button onClick={() => window.open(`https://msc.fema.gov/portal/search?AddressQuery=${encodeURIComponent(analyzer.address)}`, '_blank')} className="bg-cyan-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-cyan-700">🌊 Flood Map</button>
+                                                <button onClick={() => window.open(`https://www.google.com/maps/search/synagogue+near+${encodeURIComponent(analyzer.address)}`, '_blank')} className="bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-indigo-700">🕍 Nearby Shuls</button>
                                             </div>
                                         )}
                                     </div>
